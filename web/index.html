@@ -630,7 +630,7 @@
             fn.innerText = `Enviando ${file.name}...`;
 
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', `/iso/${encodeURIComponent(file.name)}`);
+            xhr.open('PUT', `/iso/${encodeURIComponent(file.name)}`);
             xhr.upload.onprogress = (evt) => {
                 if (evt.lengthComputable) {
                     const p = Math.round((evt.loaded / evt.total) * 100);
@@ -639,9 +639,14 @@
                 }
             };
             xhr.onload = () => {
-                showToast("Upload concluído!");
-                box.classList.add('hidden');
-                rebuildMenus();
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    showToast("Upload concluído com sucesso!");
+                    box.classList.add('hidden');
+                    rebuildMenus();
+                } else {
+                    showToast(`Erro no envio: código ${xhr.status}`, true);
+                    box.classList.add('hidden');
+                }
             };
             xhr.onerror = () => {
                 showToast("Erro no envio", true);

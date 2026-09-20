@@ -193,15 +193,25 @@ else
 fi
 
 # ==============================================================================
-# 9. COMPARTILHAMENTO DE ISOS NATIVAS DO PROXMOX (/var/lib/vz/template/iso)
+# 9. CONFIGURAÇÃO DO ARMAZENAMENTO DE ISOS
 # ==============================================================================
 PVE_ISO_DIR="/var/lib/vz/template/iso"
 BIND_ISO=0
+
 if [ -d "$PVE_ISO_DIR" ]; then
-    if whiptail --title "$TITLE - ISOs do Proxmox" \
-        --yesno "A pasta de ISOs nativa do Proxmox ($PVE_ISO_DIR) foi encontrada!\n\nDeseja compartilhar as ISOs já existentes diretamente com o ProxPXE?\n\n(Recomendado: economiza espaço e você não precisa baixar tudo de novo!)" 13 70; then
+    ISO_CHOICE=$(whiptail --title "$TITLE - Armazenamento de ISOs" \
+        --menu "Onde deseja armazenar as imagens ISO do ProxPXE?" 16 75 3 \
+        "1" "Criar pasta própria (/data/iso) no storage $CT_STORAGE (Recomendado)" \
+        "2" "Compartilhar ISOs já existentes do Proxmox ($PVE_ISO_DIR)" \
+        3>&1 1>&2 2>&3) || exit 1
+
+    if [ "$ISO_CHOICE" = "2" ]; then
         BIND_ISO=1
+    else
+        BIND_ISO=0
     fi
+else
+    BIND_ISO=0
 fi
 
 # ==============================================================================
@@ -220,7 +230,12 @@ if [ "$NET_CHOICE" = "2" ]; then
 else
     SUMMARY+="  • Modo de IP:      DHCP Automático\n"
 fi
-SUMMARY+="  • Mapear ISOs PVE: $([ "$BIND_ISO" -eq 1 ] && echo 'Sim' || echo 'Não')\n\n"
+if [ "$BIND_ISO" -eq 1 ]; then
+    SUMMARY+="  • Pasta de ISOs:   Compartilhada do Proxmox ($PVE_ISO_DIR)\n\n"
+else
+    SUMMARY+="  • Pasta de ISOs:   Própria (/data/iso no storage $CT_STORAGE)\n"
+    SUMMARY+="                     [Upload Web e Download por Link Ativos]\n\n"
+fi
 SUMMARY+="Deseja iniciar a criação do Container LXC agora?"
 
 if ! whiptail --title "$TITLE - Confirmação" --yesno "$SUMMARY" 19 65; then
@@ -281,6 +296,8 @@ fi
 if [ "$BIND_ISO" -eq 1 ]; then
     echo -e "${GREEN}[OK] Compartilhando pasta de ISOs nativas do Proxmox ($PVE_ISO_DIR) em /data/iso...${NC}"
     pct set "$CT_ID" -mp0 "${PVE_ISO_DIR},mp=/data/iso"
+else
+    echo -e "${GREEN}[OK] Criando pasta de ISOs própria (/data/iso) no storage $CT_STORAGE (Upload/Link ativados)...${NC}"
 fi
 echo -e "${GREEN}[OK] Container LXC $CT_ID criado com sucesso!${NC}"
 
@@ -296,6 +313,12 @@ for i in {1..30}; do
     fi
     sleep 1
 done
+
+# Garante estrutura de pastas e permissões no armazenamento para Upload e Download
+echo -e "Configurando permissões do armazenamento (/data/iso) para Upload Web e Download via Link..."
+pct exec "$CT_ID" -- mkdir -p /data/iso /data/extracted /data/config /data/theme
+pct exec "$CT_ID" -- chown -R www-data:www-data /data 2>/dev/null || true
+pct exec "$CT_ID" -- chmod -R 777 /data/iso /data/config /data/extracted 2>/dev/null || true
 
 # 4. Clonar e Instalar ProxPXE
 echo -e "\n${BLUE}[4/5] Clonando e instalando componentes do ProxPXE dentro do Container...${NC}"
@@ -333,11 +356,16 @@ FINAL_MSG+="  • Status:               ATIVO E RODANDO\n"
 FINAL_MSG+="  • Painel de Controle:   http://$CT_FINAL_IP\n"
 FINAL_MSG+="  • Usuário Padrão:       admin\n"
 FINAL_MSG+="  • Senha Padrão:         admin\n"
+if [ "$BIND_ISO" -eq 1 ]; then
+    FINAL_MSG+="  • Armazenamento ISOs:   Compartilhado do Proxmox ($PVE_ISO_DIR)\n"
+else
+    FINAL_MSG+="  • Armazenamento ISOs:   Pasta Própria (/data/iso no storage $CT_STORAGE)\n"
+fi
 FINAL_MSG+="  • Modo de Rede PXE:     ProxyDHCP (Porta 4011 - Seguro!)\n\n"
-FINAL_MSG+="Você já pode abrir http://$CT_FINAL_IP no seu navegador!\n"
+FINAL_MSG+="Você já pode abrir http://$CT_FINAL_IP no seu navegador para gerenciar as ISOs e temas!\n"
 FINAL_MSG+="Para dar boot nas máquinas clientes, tecle F12 e selecione Network Boot (PXE)."
 
-whiptail --title "$TITLE - Instalação Concluída!" --msgbox "$FINAL_MSG" 18 72 || true
+whiptail --title "$TITLE - Instalação Concluída!" --msgbox "$FINAL_MSG" 19 74 || true
 
 # Exibe o resumo final destacado na tela sem limpar o histórico do terminal
 echo -e "\n${GREEN}==============================================================================${NC}"
@@ -346,6 +374,12 @@ echo -e "${GREEN}===============================================================
 echo -e "  Status do Container:      ${GREEN}${BOLD}ATIVO E OPERACIONAL${NC} (CT ${BOLD}$CT_ID${NC} - ${BOLD}$CT_HOSTNAME${NC})"
 echo -e "  Storage Utilizado:        ${CYAN}${CT_STORAGE} (${CT_DISK} GB)${NC}"
 echo -e "  Memória RAM / SWAP:       ${CYAN}${CT_RAM} MB RAM / ${CT_SWAP} MB SWAP${NC}"
+if [ "$BIND_ISO" -eq 1 ]; then
+    echo -e "  Armazenamento ISOs:       ${CYAN}Compartilhado do Proxmox (${PVE_ISO_DIR})${NC}"
+else
+    echo -e "  Armazenamento ISOs:       ${GREEN}Pasta Própria (/data/iso no storage ${CT_STORAGE})${NC}"
+    echo -e "                            ${CYAN}Upload via Web e Download por Link URL ativados!${NC}"
+fi
 echo -e "------------------------------------------------------------------------------"
 echo -e "  ${WHITE}${BOLD}🌐 ENDEREÇO DE ACESSO AO PAINEL WEB:${NC}"
 echo -e "     URL:                   ${GREEN}${BOLD}http://${CT_FINAL_IP}${NC}"

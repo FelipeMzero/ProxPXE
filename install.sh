@@ -58,7 +58,9 @@ mkdir -p /var/lib/tftpboot/uefi
 mkdir -p /var/lib/tftpboot/grub/fonts
 mkdir -p /var/lib/tftpboot/theme
 
-chmod -R 755 /data
+chown -R www-data:www-data /data 2>/dev/null || true
+chmod -R 775 /data
+chmod -R 777 /data/iso /data/config /data/extracted 2>/dev/null || true
 chmod -R 755 /var/lib/tftpboot
 
 log_step "3/6: Compilando ambiente de Boot GRUB2 Netboot (UEFI & BIOS) e iPXE..."
@@ -125,6 +127,10 @@ ln -sf /etc/nginx/sites-available/pxe-server.conf /etc/nginx/sites-enabled/pxe-s
 log_step "6/6: Habilitando e iniciando serviços systemd..."
 cp "$TARGET_DIR/configs/pxe-watcher.service" /etc/systemd/system/pxe-watcher.service
 systemctl daemon-reload
+
+# Garante permissões finais para o Nginx e fcgiwrap (upload e download de ISOs)
+chown -R www-data:www-data /data 2>/dev/null || true
+chmod -R 777 /data/iso /data/config /data/extracted 2>/dev/null || true
 
 systemctl enable --now fcgiwrap
 systemctl restart fcgiwrap
