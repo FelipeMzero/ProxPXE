@@ -68,7 +68,7 @@ EOF
         cat << 'EOF'
 {
   "status": "ok",
-  "app": "Proxmox PXE Ventoy Edition (Pure Bash Stack)"
+  "app": "ProxPXE (Pure Bash Stack)"
 }
 EOF
         ;;

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Script de Criação do Container LXC (CT) do Servidor PXE Ventoy no Proxmox VE
+# ProxPXE - Script de Criação do Container LXC (CT) no Proxmox VE
 # Execute no shell do nó Proxmox VE:
-# bash -c "$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/proxmox-pxe-ventoy/main/proxmox/create-ct.sh)"
+# bash -c "$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh)"
 # ==============================================================================
 
 set -euo pipefail
@@ -22,9 +22,9 @@ fi
 
 clear
 echo -e "${MAGENTA}==============================================================================${NC}"
-echo -e "${CYAN}    PROXMOX VE - INSTALADOR AUTOMATIZADO DO SERVIDOR PXE VENTOY (BASH)${NC}"
+echo -e "${CYAN}             PROXPXE - INSTALADOR AUTOMATIZADO NO PROXMOX VE                  ${NC}"
 echo -e "${MAGENTA}==============================================================================${NC}"
-echo -e "Este assistente criará um Container LXC otimizado para o Servidor PXE"
+echo -e "Este assistente criará um Container LXC otimizado para o ProxPXE"
 echo -e "com Menu Gráfico estilo Ventoy, ProxyDHCP e Painel de Controle Web.\n"
 
 # 1. CT ID
@@ -38,7 +38,7 @@ if pct status "$CT_ID" >/dev/null 2>&1; then
 fi
 
 # 2. Hostname
-DEFAULT_HOSTNAME="pxe-ventoy"
+DEFAULT_HOSTNAME="proxpxe"
 read -r -p "Nome da máquina (Hostname) [Padrão: $DEFAULT_HOSTNAME]: " CT_HOSTNAME
 CT_HOSTNAME=${CT_HOSTNAME:-$DEFAULT_HOSTNAME}
 
@@ -84,7 +84,7 @@ PVE_ISO_DIR="/var/lib/vz/template/iso"
 BIND_ISO=0
 if [ -d "$PVE_ISO_DIR" ]; then
     echo -e "\n${YELLOW}[RECURSO ESPECIAL]${NC} A pasta de ISOs nativa do Proxmox (${PVE_ISO_DIR}) foi encontrada!"
-    read -r -p "Deseja compartilhar as ISOs já baixadas no Proxmox diretamente com o PXE? [S/n]: " SHARE_ISO
+    read -r -p "Deseja compartilhar as ISOs já baixadas no Proxmox diretamente com o ProxPXE? [S/n]: " SHARE_ISO
     SHARE_ISO=${SHARE_ISO:-S}
     if [[ "$SHARE_ISO" =~ ^[Ss]$ ]]; then
         BIND_ISO=1
@@ -144,14 +144,14 @@ for i in {1..30}; do
     sleep 1
 done
 
-# 11. Instalação da Aplicação PXE
-echo -e "\n${BLUE}[4/5] Baixando repositório e instalando componentes PXE...${NC}"
+# 11. Instalação da Aplicação ProxPXE
+echo -e "\n${BLUE}[4/5] Baixando repositório e instalando componentes do ProxPXE...${NC}"
 pct exec "$CT_ID" -- apt-get update -y
 pct exec "$CT_ID" -- apt-get install -y git curl
 
-# Baixa ou copia os arquivos
+# Baixa o repositório oficial do ProxPXE
 pct exec "$CT_ID" -- rm -rf /tmp/pxe-setup
-pct exec "$CT_ID" -- git clone https://github.com/FelipeMzero/proxmox-pxe-ventoy.git /tmp/pxe-setup
+pct exec "$CT_ID" -- git clone https://github.com/FelipeMzero/ProxPXE.git /tmp/pxe-setup
 pct exec "$CT_ID" -- bash /tmp/pxe-setup/install.sh
 
 # Obtém o IP final
@@ -159,7 +159,7 @@ CT_FINAL_IP=$(pct exec "$CT_ID" -- hostname -I | awk '{print $1}')
 
 clear
 echo -e "${GREEN}==============================================================================${NC}"
-echo -e "${GREEN}      PARABÉNS! SERVIDOR PXE VENTOY CRIADO COM SUCESSO NO PROXMOX VE!         ${NC}"
+echo -e "${GREEN}            PARABÉNS! PROXPXE INSTALADO COM SUCESSO NO PROXMOX VE!            ${NC}"
 echo -e "${GREEN}==============================================================================${NC}"
 echo -e "  Container ID:             ${CYAN}${CT_ID} (${CT_HOSTNAME})${NC}"
 echo -e "  Painel de Controle Web:   ${GREEN}http://${CT_FINAL_IP}${NC}"

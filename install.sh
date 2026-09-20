@@ -101,6 +101,7 @@ if [ -d "$SCRIPT_DIR/scripts" ]; then
 fi
 
 chmod +x "$TARGET_DIR"/scripts/*.sh
+ln -sf "$TARGET_DIR/scripts/pxe-cli.sh" /usr/local/bin/proxpxe
 ln -sf "$TARGET_DIR/scripts/pxe-cli.sh" /usr/local/bin/pxe-cli
 
 # Gera tema inicial e converte fontes

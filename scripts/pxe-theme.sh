@@ -48,7 +48,7 @@ fi
 # 3. Gera o arquivo theme.txt idêntico ao layout do Ventoy
 cat << EOF > "$THEME_DIR/theme.txt"
 # ==========================================
-# Ventoy-Style PXE GRUB2 Theme
+# ProxPXE Ventoy-Style GRUB2 Theme
 # Gerado por pxe-theme.sh
 # ==========================================
 

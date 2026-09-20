@@ -27,7 +27,7 @@ echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR..."
 # Inicia cabeçalho do grub.cfg
 cat << 'EOF' > "$GRUB_CFG"
 # ====================================================
-# PROXMOX PXE - MENU GRÁFICO ESTILO VENTOY (GRUB2)
+# PROXPXE - MENU GRÁFICO ESTILO VENTOY (GRUB2)
 # Gerado automaticamente pelo script pxe-scan.sh
 # ====================================================
 

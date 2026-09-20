@@ -36,7 +36,7 @@ case "${1:-}" in
         ;;
     status)
         echo -e "${CYAN}====================================================${NC}"
-        echo -e "${GREEN}      STATUS DO SERVIDOR PXE VENTOY (PROXMOX)       ${NC}"
+        echo -e "${GREEN}          STATUS DO SERVIDOR PROXPXE (PROXMOX)      ${NC}"
         echo -e "${CYAN}====================================================${NC}"
         echo -e "IP do Servidor: $(hostname -I | awk '{print $1}')"
         echo -e "Serviço Dnsmasq (ProxyDHCP/TFTP): $(systemctl is-active dnsmasq 2>/dev/null || echo 'desconhecido')"
@@ -56,19 +56,18 @@ case "${1:-}" in
             echo -e "${GREEN}Modo ProxyDHCP ativado com sucesso!${NC}"
         elif [ "$MODE" = "standalone" ]; then
             echo -e "${YELLOW}Configurando Dnsmasq para Servidor DHCP Completo...${NC}"
-            # standalone template
             systemctl restart dnsmasq 2>/dev/null || true
             echo -e "${GREEN}Modo Standalone DHCP ativado!${NC}"
         else
-            echo "Uso: pxe-cli mode [proxy|standalone]"
+            echo "Uso: proxpxe mode [proxy|standalone]"
         fi
         ;;
     *)
-        echo -e "${CYAN}Proxmox PXE Ventoy Manager - Comandos disponíveis:${NC}"
-        echo -e "  ${GREEN}pxe-cli scan${NC}       - Escaneia a pasta /data/iso e regenera menus GRUB/iPXE"
-        echo -e "  ${GREEN}pxe-cli theme${NC}      - Atualiza layout, logo e converte fontes .ttf para .pf2"
-        echo -e "  ${GREEN}pxe-cli list${NC}       - Exibe as ISOs cadastradas"
-        echo -e "  ${GREEN}pxe-cli status${NC}     - Exibe status dos serviços e rede"
-        echo -e "  ${GREEN}pxe-cli mode proxy${NC} - Ativa modo ProxyDHCP (Não interfere no seu roteador)"
+        echo -e "${CYAN}ProxPXE Manager - Comandos disponíveis:${NC}"
+        echo -e "  ${GREEN}proxpxe scan${NC}       - Escaneia a pasta /data/iso e regenera menus GRUB/iPXE"
+        echo -e "  ${GREEN}proxpxe theme${NC}      - Atualiza layout, logo e converte fontes .ttf para .pf2"
+        echo -e "  ${GREEN}proxpxe list${NC}       - Exibe as ISOs cadastradas"
+        echo -e "  ${GREEN}proxpxe status${NC}     - Exibe status dos serviços e rede"
+        echo -e "  ${GREEN}proxpxe mode proxy${NC} - Ativa modo ProxyDHCP (Não interfere no seu roteador)"
         ;;
 esac
