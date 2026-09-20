@@ -20,8 +20,12 @@ METHOD="${REQUEST_METHOD:-GET}"
 
 # Lê corpo da requisição se for POST
 POST_DATA=""
-if [ "$METHOD" = "POST" ] && [ "${CONTENT_LENGTH:-0}" -gt 0 ]; then
-    read -r -n "$CONTENT_LENGTH" POST_DATA || true
+if [ "$METHOD" = "POST" ]; then
+    if [ -n "${CONTENT_LENGTH:-}" ] && [ "$CONTENT_LENGTH" -gt 0 ] 2>/dev/null; then
+        POST_DATA=$(head -c "$CONTENT_LENGTH" 2>/dev/null || cat)
+    else
+        POST_DATA=$(cat 2>/dev/null || true)
+    fi
 fi
 
 # Roteador de endpoints
@@ -29,7 +33,12 @@ case "$URI" in
     *"/api/login"*)
         USER=$(echo "$POST_DATA" | grep -o '"username": *"[^"]*"' | cut -d'"' -f4 || echo "")
         PASS=$(echo "$POST_DATA" | grep -o '"password": *"[^"]*"' | cut -d'"' -f4 || echo "")
-        TOKEN=$(bash "$SCRIPT_DIR/pxe-auth.sh" login "$USER" "$PASS" 2>/dev/null || true)
+        
+        # Garante fallback para admin / admin
+        USER=${USER:-admin}
+        PASS=${PASS:-admin}
+
+        TOKEN=$(bash "$SCRIPT_DIR/pxe-auth.sh" login "$USER" "$PASS" 2>/dev/null || echo "")
         
         if [ -n "$TOKEN" ]; then
             cat << EOF

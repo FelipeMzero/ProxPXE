@@ -128,6 +128,19 @@ log_step "6/6: Habilitando e iniciando serviços systemd..."
 cp "$TARGET_DIR/configs/pxe-watcher.service" /etc/systemd/system/pxe-watcher.service
 systemctl daemon-reload
 
+# Inicializa auth.json e diretório de sessões com permissão para o painel web
+mkdir -p /data/config /tmp/proxpxe_sessions
+if [ ! -f /data/config/auth.json ]; then
+    cat << 'EOF' > /data/config/auth.json
+{
+  "username": "admin",
+  "password_hash": "admin"
+}
+EOF
+fi
+chmod 666 /data/config/auth.json 2>/dev/null || true
+chmod 777 /tmp/proxpxe_sessions 2>/dev/null || true
+
 # Garante permissões finais para o Nginx e fcgiwrap (upload e download de ISOs)
 chown -R www-data:www-data /data 2>/dev/null || true
 chmod -R 777 /data/iso /data/config /data/extracted 2>/dev/null || true
