@@ -29,6 +29,8 @@ echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR e $PVE_ISO_DIR..
 
 # Inicia cabeçalho do pxelinux.cfg/default (BIOS Legacy)
 cat << 'EOF' > "$SYS_CFG"
+PATH bios/ /
+UI menu.c32
 DEFAULT menu.c32
 PROMPT 0
 TIMEOUT 150
@@ -116,10 +118,12 @@ menu Proxmox PXE Boot Menu (Ventoy Style)
 item --gap --             --- Imagens ISO Disponíveis ---
 EOF
 
-# Prepara JSON
+# Prepara JSON e targets do iPXE
 echo "[" > "$JSON_OUT"
 FIRST_JSON=1
 ISO_COUNT=0
+IPXE_TARGETS="/tmp/ipxe_targets_$$.tmp"
+> "$IPXE_TARGETS"
 
 # Coleta ISOs tanto da pasta local quanto do Proxmox compartilhado
 shopt -s nullglob nocaseglob
@@ -292,6 +296,47 @@ EOF
     # --- Gera Entrada no iPXE ---
     echo "item iso_$ISO_COUNT $os_title [$iso_source]" >> "$IPXE_CFG"
 
+    cat << EOF >> "$IPXE_TARGETS"
+:iso_$ISO_COUNT
+EOF
+    if [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$IPXE_TARGETS"
+echo Carregando Ubuntu Kernel e Initrd via HTTP...
+kernel http://$SERVER_IP/extracted/$rel_kernel ip=dhcp url=http://$SERVER_IP/$http_dir/$iso_name ds=nocloud-net --- || goto failed
+initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
+boot
+EOF
+    elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$IPXE_TARGETS"
+echo Carregando Debian Live via HTTP...
+kernel http://$SERVER_IP/extracted/$rel_kernel boot=live components fetch=http://$SERVER_IP/$http_dir/$iso_name || goto failed
+initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
+boot
+EOF
+    elif [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$IPXE_TARGETS"
+echo Carregando Proxmox VE Installer via HTTP...
+kernel http://$SERVER_IP/extracted/$rel_kernel vga=791 splash=silent ip=dhcp || goto failed
+initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
+boot
+EOF
+    elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$IPXE_TARGETS"
+echo Carregando Clonezilla Live via HTTP...
+kernel http://$SERVER_IP/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$iso_name || goto failed
+initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
+boot
+EOF
+    else
+        cat << EOF >> "$IPXE_TARGETS"
+echo Carregando $iso_name via Memdisk (RAM)...
+kernel http://$SERVER_IP/memdisk iso raw || goto failed
+initrd http://$SERVER_IP/$http_dir/$iso_name || goto failed
+boot
+EOF
+    fi
+    echo "" >> "$IPXE_TARGETS"
+
     # --- Adiciona no JSON para o Painel Web ---
     if [ "$FIRST_JSON" -eq 0 ]; then
         echo "," >> "$JSON_OUT"
@@ -375,7 +420,25 @@ reboot
 
 :exit
 exit
+
+:failed
+echo
+echo [ERRO] Falha ao carregar a imagem via rede.
+echo Pressione qualquer tecla para retornar ao menu principal...
+prompt
+goto start
 EOF
+
+# Anexa os blocos de boot das ISOs no iPXE
+if [ -f "$IPXE_TARGETS" ]; then
+    cat "$IPXE_TARGETS" >> "$IPXE_CFG"
+    rm -f "$IPXE_TARGETS"
+fi
+
+# Espelha menu.ipxe para HTTP e TFTP
+cp "$IPXE_CFG" "$TFTP_DIR/bios/menu.ipxe" 2>/dev/null || true
+cp "$IPXE_CFG" "$TFTP_DIR/menu.ipxe" 2>/dev/null || true
+cp "$IPXE_CFG" "/data/menu.ipxe" 2>/dev/null || true
 
 # Permissões do TFTP
 chmod -R 777 "$TFTP_DIR" 2>/dev/null || true
