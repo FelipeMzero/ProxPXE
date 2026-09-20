@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxmox PXE Ventoy Server</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: { 900: '#0b0f19', 800: '#111827', 700: '#1f2937', 600: '#374151' },
+                        brand: { 500: '#3b82f6', 600: '#2563eb' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .ventoy-screen {
+            background-size: cover;
+            background-position: center;
+        }
+    </style>
+</head>
+<body class="bg-dark-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="border-b border-dark-700 bg-dark-800/90 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/20">
+                    <i class="fa-solid fa-server text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        Proxmox PXE <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Bash Edition</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Boot de Rede PXE com Menu Gráfico Estilo Ventoy</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-4">
+                <div class="bg-dark-700/60 px-3 py-1.5 rounded-lg border border-dark-600 flex items-center space-x-2 text-xs">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-slate-400">IP:</span>
+                    <span id="header-ip" class="font-mono text-emerald-400 font-semibold">127.0.0.1</span>
+                </div>
+                <button onclick="rebuildMenus()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition flex items-center gap-2 shadow-sm">
+                    <i class="fa-solid fa-arrows-rotate" id="sync-icon"></i>
+                    <span>Regenerar Menu PXE</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- Status Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-dark-800 p-4 rounded-xl border border-dark-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium uppercase">Modo DHCP</p>
+                    <p class="text-xl font-bold text-white mt-1">ProxyDHCP</p>
+                    <span class="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                        <i class="fa-solid fa-circle-check"></i> Seguro p/ seu roteador
+                    </span>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+            </div>
+
+            <div class="bg-dark-800 p-4 rounded-xl border border-dark-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium uppercase">ISOs Indexadas</p>
+                    <p id="dash-iso-count" class="text-xl font-bold text-white mt-1">0</p>
+                    <span class="text-[11px] text-slate-400 mt-0.5 block">Prontas para boot</span>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl">
+                    <i class="fa-solid fa-compact-disc"></i>
+                </div>
+            </div>
+
+            <div class="bg-dark-800 p-4 rounded-xl border border-dark-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium uppercase">Armazenamento (/data)</p>
+                    <p id="dash-disk-used" class="text-xl font-bold text-white mt-1">--</p>
+                    <span id="dash-disk-free" class="text-[11px] text-slate-400 mt-0.5 block">Espaço em disco</span>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl">
+                    <i class="fa-solid fa-hard-drive"></i>
+                </div>
+            </div>
+
+            <div class="bg-dark-800 p-4 rounded-xl border border-dark-700 flex items-center justify-between">
+                <div>
+                    <p class="text-xs text-slate-400 font-medium uppercase">Serviços do CT</p>
+                    <div class="flex items-center space-x-2 mt-1.5 text-xs font-mono">
+                        <span class="px-2 py-0.5 rounded bg-dark-700 border border-dark-600 text-emerald-400">TFTP: OK</span>
+                        <span class="px-2 py-0.5 rounded bg-dark-700 border border-dark-600 text-emerald-400">HTTP: OK</span>
+                    </div>
+                </div>
+                <div class="w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-xl">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ventoy Screen Simulation -->
+        <div class="bg-dark-800 p-6 rounded-2xl border border-dark-700 space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-display text-brand-400"></i>
+                    Simulador em Tempo Real da Tela de Boot Ventoy (GRUB2)
+                </h2>
+                <span class="text-xs text-slate-400 font-mono">1920x1080 Full HD</span>
+            </div>
+
+            <!-- Monitor Frame -->
+            <div class="p-2.5 bg-black rounded-2xl border-4 border-dark-700 shadow-2xl">
+                <div id="sim-screen" class="ventoy-screen aspect-video w-full rounded-lg relative overflow-hidden flex flex-col justify-between p-6 select-none" style="background-color: #0b0f19; background-image: url('/theme/background.png');">
+                    
+                    <!-- Top Logo -->
+                    <div class="w-full flex justify-center items-center pt-2">
+                        <img id="sim-logo" src="/theme/logo.png" alt="PXE Logo" class="h-12 sm:h-16 object-contain drop-shadow-md" onerror="this.style.display='none'">
+                    </div>
+
+                    <!-- Central Menu Box -->
+                    <div class="w-4/5 mx-auto bg-dark-900/85 backdrop-blur border border-slate-700 rounded-xl p-3 shadow-2xl space-y-1.5 my-auto">
+                        <div id="sim-menu-items" class="space-y-1 text-xs">
+                            <div class="p-4 text-center text-slate-400 italic">Carregando lista de ISOs...</div>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Bar -->
+                    <div class="w-4/5 mx-auto space-y-2 pb-1">
+                        <div class="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-brand-500 h-full w-2/3 rounded-full"></div>
+                        </div>
+                        <div class="text-center text-[10px] text-slate-400 font-mono tracking-wider">
+                            [Enter] Iniciar Selecionado &nbsp;|&nbsp; [e] Editar Kernel &nbsp;|&nbsp; [c] Console GRUB &nbsp;|&nbsp; [Esc] Voltar
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Folder Customization Reference -->
+        <div class="bg-dark-800 p-5 rounded-xl border border-dark-700">
+            <h3 class="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-folder-tree text-amber-400"></i> Pastas de Customização no Container Proxmox
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                <div class="bg-dark-900 p-3 rounded-lg border border-dark-700">
+                    <p class="text-slate-400 mb-1 font-semibold">1. Imagens ISO:</p>
+                    <code class="text-emerald-400 font-mono">/data/iso/</code>
+                    <p class="text-slate-500 text-[10px] mt-1">Coloque arquivos .iso ou .img aqui.</p>
+                </div>
+                <div class="bg-dark-900 p-3 rounded-lg border border-dark-700">
+                    <p class="text-slate-400 mb-1 font-semibold">2. Logo e Papel de Parede:</p>
+                    <code class="text-blue-400 font-mono">/data/theme/</code>
+                    <p class="text-slate-500 text-[10px] mt-1">logo.png e background.png</p>
+                </div>
+                <div class="bg-dark-900 p-3 rounded-lg border border-dark-700">
+                    <p class="text-slate-400 mb-1 font-semibold">3. Fontes do Menu:</p>
+                    <code class="text-purple-400 font-mono">/data/theme/fonts/</code>
+                    <p class="text-slate-500 text-[10px] mt-1">Coloque fontes .pf2 ou .ttf.</p>
+                </div>
+                <div class="bg-dark-900 p-3 rounded-lg border border-dark-700">
+                    <p class="text-slate-400 mb-1 font-semibold">4. Ícones dos Sistemas:</p>
+                    <code class="text-amber-400 font-mono">/data/theme/icons/</code>
+                    <p class="text-slate-500 text-[10px] mt-1">Ícones .png de cada sistema.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ISO List Table -->
+        <div class="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden shadow-lg p-5 space-y-4">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-brand-400"></i> Imagens ISO Cadastradas para Boot de Rede
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-dark-900 text-slate-400 uppercase tracking-wider font-semibold border-b border-dark-700">
+                        <tr>
+                            <th class="p-3">Tipo</th>
+                            <th class="p-3">Título no Menu</th>
+                            <th class="p-3">Arquivo</th>
+                            <th class="p-3">Tamanho</th>
+                        </tr>
+                    </thead>
+                    <tbody id="iso-table-body" class="divide-y divide-dark-700 text-slate-300">
+                        <tr>
+                            <td colspan="4" class="p-4 text-center text-slate-500">Nenhuma ISO detectada. Coloque arquivos em /data/iso/</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-dark-800 border border-brand-500 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs hidden">
+        <span id="toast-msg">Mensagem</span>
+    </div>
+
+    <script>
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        async function fetchStatus() {
+            try {
+                const res = await fetch('/api/status');
+                const data = await res.json();
+                document.getElementById('header-ip').innerText = data.server_ip;
+                document.getElementById('dash-iso-count').innerText = data.iso_count;
+                document.getElementById('dash-disk-used').innerText = `${data.disk.used} (${data.disk.percent})`;
+                document.getElementById('dash-disk-free').innerText = `${data.disk.free} livres`;
+            } catch (e) {
+                console.log("Status offline");
+            }
+        }
+
+        async function fetchIsos() {
+            try {
+                const res = await fetch('/api/isos');
+                const isos = await res.json();
+                
+                const tbody = document.getElementById('iso-table-body');
+                const simBox = document.getElementById('sim-menu-items');
+
+                if (isos.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-500">Nenhuma ISO encontrada em /data/iso/</td></tr>`;
+                    simBox.innerHTML = `<div class="p-4 text-center text-slate-400 italic">[ Nenhuma imagem ISO em /data/iso/ ]</div>`;
+                    return;
+                }
+
+                tbody.innerHTML = isos.map(i => `
+                    <tr class="hover:bg-dark-700/50">
+                        <td class="p-3 font-bold uppercase text-brand-400">${i.icon}</td>
+                        <td class="p-3 font-medium text-white">${i.title}</td>
+                        <td class="p-3 font-mono text-slate-400">${i.filename}</td>
+                        <td class="p-3">${i.size_mb} MB</td>
+                    </tr>
+                `).join('');
+
+                simBox.innerHTML = isos.slice(0, 5).map((iso, idx) => `
+                    <div class="flex items-center justify-between px-3 py-2 rounded-lg ${idx === 0 ? 'bg-brand-600 text-white font-medium shadow' : 'text-slate-300'}">
+                        <div class="flex items-center space-x-2.5">
+                            <span class="w-5 h-5 rounded bg-white/10 flex items-center justify-center text-[10px] uppercase font-bold">${iso.icon[0]}</span>
+                            <span>${iso.title}</span>
+                        </div>
+                        ${idx === 0 ? '<i class="fa-solid fa-chevron-right text-[10px]"></i>' : ''}
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.log("Isos fetch error", e);
+            }
+        }
+
+        async function rebuildMenus() {
+            const icon = document.getElementById('sync-icon');
+            icon.classList.add('fa-spin');
+            try {
+                const res = await fetch('/api/rebuild', { method: 'POST' });
+                const data = await res.json();
+                showToast(data.message || "Menu regenerado!");
+                fetchStatus();
+                fetchIsos();
+            } catch (e) {
+                showToast("Erro ao regenerar menu");
+            } finally {
+                icon.classList.remove('fa-spin');
+            }
+        }
+
+        window.onload = () => {
+            fetchStatus();
+            fetchIsos();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+# OS generated
+.DS_Store
+Thumbs.db
+
+# User ISO data (do not push huge ISOs to git)
+/data/iso/*.iso
+/data/iso/*.img
+/data/extracted/*
+!/data/extracted/.gitkeep
+/data/config/*.json
+
+# Logs
+*.log
+
+app/
+tftp/
