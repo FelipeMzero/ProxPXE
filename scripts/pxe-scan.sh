@@ -61,8 +61,14 @@ set gfxpayload=keep
 terminal_output gfxterm
 
 # Carrega Fontes e Tema Gráfico do Ventoy
-if loadfont (http,$pxe_server)/theme/fonts/unicode.pf2 ; then
+if loadfont (http,$pxe_server)/theme/fonts/Outfit.pf2 ; then
     set theme=(http,$pxe_server)/theme/theme.txt
+    export theme
+elif loadfont (http,$pxe_server)/theme/fonts/unicode.pf2 ; then
+    set theme=(http,$pxe_server)/theme/theme.txt
+    export theme
+elif loadfont (tftp)/theme/fonts/Outfit.pf2 ; then
+    set theme=(tftp)/theme/theme.txt
     export theme
 elif loadfont (tftp)/theme/fonts/unicode.pf2 ; then
     set theme=(tftp)/theme/theme.txt

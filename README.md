@@ -12,38 +12,49 @@ Abra o **Shell do seu nó Proxmox VE (PVE)** e execute o comando abaixo:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh)"
 ```
 
-O assistente interativo:
-1. Detecta automaticamente o próximo ID de Container disponível (ex: `110`).
-2. Permite escolher o storage (`local-lvm`, `local-zfs`, etc.), memória RAM e rede (`vmbr0`).
-3. **Compartilha suas ISOs do Proxmox:** Pergunta se você deseja montar `/var/lib/vz/template/iso` diretamente dentro do container, economizando espaço em disco!
-4. Baixa o template oficial Debian 12, configura o bootloader GRUB2 Netboot e inicia todos os serviços do ProxPXE.
-5. Ao finalizar, exibe o IP para você acessar o painel no navegador!
+O assistente interativo perguntará detalhadamente:
+1. **Container ID e Hostname:** Sugere o próximo ID livre (ex: `110`) e nome `proxpxe`.
+2. **Onde vai ser instalado o CT (Storage):** Lista todos os storages disponíveis no Proxmox (`local-lvm`, `local-zfs`, etc.).
+3. **Armazenamento:** Quantidade de disco em GB (padrão: `32 GB`).
+4. **Memória RAM:** Quantidade de memória RAM em MB (padrão: `2048 MB`).
+5. **Memória SWAP:** Quantidade de memória SWAP em MB (padrão: `512 MB`).
+6. **Rede e Endereço IP:**
+   - Opção 1: Usar a **range da sua rede local para pegar o IP via DHCP automaticamente** (Recomendado).
+   - Opção 2: Definir um **IP específico / fixo** manualmente (IP/CIDR, Gateway e Servidor DNS).
+7. **Compartilhamento de ISOs do Proxmox:** Pergunta se deseja montar `/var/lib/vz/template/iso` diretamente no container, economizando espaço em disco!
+
+---
+
+## 🔐 Acesso ao Painel Web & Credenciais Padrão
+
+Acesse no navegador: **`http://<IP_DO_CONTAINER>`**
+
+- **Usuário Padrão:** `admin`
+- **Senha Padrão:** `admin`
+
+*(Você pode alterar as credenciais diretamente pelo painel a qualquer momento).*
 
 ---
 
 ## 🌟 Principais Recursos do ProxPXE
 
-- **Aplicação 100% em Shell Script (Bash):**
-  - Zero dependências pesadas (sem Python, sem Node, sem Docker).
-  - Consumo mínimo de memória RAM (< 150 MB para todo o container!).
-  - Scripts modulares: `pxe-scan.sh`, `pxe-theme.sh`, `pxe-watch.sh` e `proxpxe` CLI.
+- **Fonte Padrão: Outfit:**
+  - Fonte moderna e geométrica configurada como padrão tanto no **Menu Ventoy (GRUB2)** quanto na **Interface Web**.
+- **Descarregar ISO Diretamente via URL:**
+  - Cole o link de download direto de qualquer ISO (Ubuntu, Windows, Proxmox, Debian, etc.).
+  - O download ocorre em segundo plano com barra de progresso em tempo real, velocidade (MB/s) e opção de cancelamento.
+- **Upload Direto de ISOs:**
+  - Envie arquivos `.iso` ou `.img` direto do seu computador com barra de progresso.
+- **Análise Detalhada de Disco (/data):**
+  - Gráficos de uso do armazenamento, tamanho ocupado pelas ISOs, kernels de live-boot e espaço disponível.
+- **Computadores Conectados & Status de Instalação em Tempo Real (%):**
+  - Visualize os computadores conectados na rede por IP, MAC e Hostname.
+  - Acompanhe a **porcentagem exata de instalação (%)** e a transferência da imagem em tempo real!
 - **Tela de Boot Estilo Ventoy:**
   - Baseada no motor gráfico `gfxmenu` do GRUB2 em alta resolução (1920x1080 Full HD).
-  - Suporte completo a **UEFI (x86_64)** e **Legacy BIOS**.
-  - Logotipo centralizado com a marca **ProxPXE**, papel de parede moderno, barra de contagem regressiva e atalhos de teclado.
-- **Detecção Inteligente de Imagens ISO:**
-  - Basta colocar qualquer arquivo `.iso` em `/data/iso/`.
-  - O daemon em segundo plano detecta automaticamente o novo arquivo e **atualiza o menu de boot na hora**!
-  - Reconhece: Proxmox VE, Windows 10/11/Server, Ubuntu, Debian, Clonezilla, Arch Linux e ISOs utilitárias.
-  - Oferece modos rápidos: **HTTP Live Streaming**, **iPXE Sanboot** ou **Memdisk RAM**.
+  - Suporte a **UEFI (x86_64)** e **Legacy BIOS**.
 - **Modo Seguro ProxyDHCP (Porta 4011):**
-  - O roteador da sua casa ou empresa continua distribuindo os IPs normalmente.
-  - O servidor PXE responde **somente** quando um computador solicita inicialização por rede.
-  - Zero risco de conflito de IP na sua rede local!
-- **Painel de Controle Web Integrado:**
-  - Visualize o status da rede, espaço em disco e ISOs cadastradas.
-  - **Simulador Interativo da Tela Ventoy** em tempo real no navegador.
-  - Botão de atualização rápida de menus.
+  - Não altera nem interfere no roteador da sua casa ou empresa. Responde apenas a solicitações de boot por rede.
 
 ---
 

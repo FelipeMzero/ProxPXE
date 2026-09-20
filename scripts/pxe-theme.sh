@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# PROXMOX PXE - GERENCIADOR DE TEMA VENTOY (GRUB2 THEME)
-# 100% Bash Shell Script
+# ProxPXE - Gerenciador de Tema Ventoy (Outfit Font Default) (100% Bash)
 # ==============================================================================
 
 set -eo pipefail
@@ -13,43 +12,47 @@ TFTP_THEME="/var/lib/tftpboot/theme"
 
 mkdir -p "$THEME_DIR" "$FONTS_DIR" "$ICONS_DIR" "$TFTP_THEME"
 
-echo "==> [PXE-THEME] Configurando tema Ventoy e fontes..."
+echo "==> [PROXPXE-THEME] Configurando tema Ventoy e fonte padrão Outfit..."
 
-# 1. Converte fontes .ttf para .pf2 se grub-mkfont estiver disponível
+# 1. Converte a fonte padrão Outfit.ttf para Outfit.pf2 se disponível
 if command -v grub-mkfont >/dev/null 2>&1; then
+    # Converte Outfit.ttf prioritariamente
+    if [ -f "$FONTS_DIR/Outfit.ttf" ] && [ ! -f "$FONTS_DIR/Outfit.pf2" ]; then
+        echo "    -> Convertendo fonte Outfit.ttf para Outfit.pf2..."
+        grub-mkfont -s 14 -o "$FONTS_DIR/Outfit.pf2" "$FONTS_DIR/Outfit.ttf" || true
+    fi
+
+    # Converte outras fontes .ttf
     for ttf in "$FONTS_DIR"/*.ttf "$FONTS_DIR"/*.otf; do
         [ -f "$ttf" ] || continue
         pf2_name="$(basename "${ttf%.*}").pf2"
         if [ ! -f "$FONTS_DIR/$pf2_name" ]; then
-            echo "    -> Convertendo fonte $ttf para $pf2_name..."
+            echo "    -> Convertendo $ttf para $pf2_name..."
             grub-mkfont -s 14 -o "$FONTS_DIR/$pf2_name" "$ttf" || true
         fi
     done
 
-    # Garante a existência de unicode.pf2 padrão
-    if [ ! -f "$FONTS_DIR/unicode.pf2" ]; then
+    # Fallback caso Outfit não exista
+    if [ ! -f "$FONTS_DIR/Outfit.pf2" ] && [ ! -f "$FONTS_DIR/unicode.pf2" ]; then
         if [ -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf ]; then
-            echo "    -> Gerando unicode.pf2 a partir de DejaVuSans..."
             grub-mkfont -s 14 -o "$FONTS_DIR/unicode.pf2" /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf || true
-        elif [ -f /usr/share/fonts/truetype/unifont/unifont.ttf ]; then
-            echo "    -> Gerando unicode.pf2 a partir de Unifont..."
-            grub-mkfont -s 14 -o "$FONTS_DIR/unicode.pf2" /usr/share/fonts/truetype/unifont/unifont.ttf || true
         fi
     fi
 fi
 
-# 2. Localiza a fonte ativa
-ACTIVE_FONT="unicode"
-FIRST_PF2=$(find "$FONTS_DIR" -name "*.pf2" 2>/dev/null | head -n1 || true)
-if [ -n "$FIRST_PF2" ]; then
-    ACTIVE_FONT=$(basename "${FIRST_PF2%.*}")
+# 2. Define a fonte ativa (Prioridade: Outfit -> unicode)
+ACTIVE_FONT="Outfit"
+if [ -f "$FONTS_DIR/Outfit.pf2" ]; then
+    ACTIVE_FONT="Outfit"
+elif [ -f "$FONTS_DIR/unicode.pf2" ]; then
+    ACTIVE_FONT="unicode"
 fi
 
-# 3. Gera o arquivo theme.txt idêntico ao layout do Ventoy
+# 3. Gera o arquivo theme.txt com layout do Ventoy
 cat << EOF > "$THEME_DIR/theme.txt"
 # ==========================================
 # ProxPXE Ventoy-Style GRUB2 Theme
-# Gerado por pxe-theme.sh
+# Fonte Padrão: $ACTIVE_FONT
 # ==========================================
 
 title-text: ""
@@ -77,9 +80,9 @@ terminal-box: "terminal_box_*.png"
 
 # Logo do Sistema no Topo
 + image {
-    left = 50%-130
+    left = 50%-140
     top = 8%
-    width = 260
+    width = 280
     height = 68
     file = "logo.png"
 }
@@ -114,4 +117,4 @@ if [ -d "$TFTP_THEME" ]; then
     cp -r "$THEME_DIR"/* "$TFTP_THEME/" 2>/dev/null || true
 fi
 
-echo "==> [PXE-THEME] Tema Ventoy atualizado com sucesso!"
+echo "==> [PROXPXE-THEME] Tema configurado com fonte $ACTIVE_FONT!"
