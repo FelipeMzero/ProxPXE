@@ -8,6 +8,7 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ISO_DIR="${ISO_DIR:-/data/iso}"
+PVE_ISO_DIR="${PVE_ISO_DIR:-/data/proxmox-iso}"
 THEME_DIR="${THEME_DIR:-/data/theme}"
 CONFIG_DIR="${CONFIG_DIR:-/data/config}"
 
@@ -19,7 +20,7 @@ NC='\033[0m'
 
 case "${1:-}" in
     scan)
-        echo -e "${CYAN}==> Escaneando ISOs e regenerando menus do PXE...${NC}"
+        echo -e "${CYAN}==> Escaneando ISOs e regenerando menus do PXE (GRUB, Syslinux, iPXE)...${NC}"
         bash "$SCRIPT_DIR/pxe-scan.sh"
         ;;
     theme)
@@ -27,11 +28,16 @@ case "${1:-}" in
         bash "$SCRIPT_DIR/pxe-theme.sh"
         ;;
     list)
-        echo -e "${CYAN}==> Imagens ISO encontradas em $ISO_DIR:${NC}"
+        echo -e "${CYAN}==> Imagens ISO cadastradas no ProxPXE:${NC}"
         if [ -f "$CONFIG_DIR/isos.json" ]; then
             cat "$CONFIG_DIR/isos.json"
         else
-            ls -lh "$ISO_DIR"
+            echo "--- ISOs Locais ($ISO_DIR) ---"
+            ls -lh "$ISO_DIR"/*.iso 2>/dev/null || echo "Nenhuma ISO local encontrada."
+            if [ -d "$PVE_ISO_DIR" ]; then
+                echo "--- ISOs Proxmox ($PVE_ISO_DIR) ---"
+                ls -lh "$PVE_ISO_DIR"/*.iso 2>/dev/null || echo "Nenhuma ISO do Proxmox encontrada."
+            fi
         fi
         ;;
     status)
@@ -43,7 +49,10 @@ case "${1:-}" in
         echo -e "Serviço Nginx (HTTP Streaming):   $(systemctl is-active nginx 2>/dev/null || echo 'desconhecido')"
         echo -e "Serviço Monitor de ISOs:          $(systemctl is-active pxe-watcher 2>/dev/null || echo 'desconhecido')"
         echo -e "Espaço em Disco (/data):          $(df -h /data 2>/dev/null | awk 'NR==2 {print $3 " usado / " $4 " livre (" $5 ")"}')"
-        echo -e "ISOs cadastradas:                 $(ls -1 "$ISO_DIR"/*.iso 2>/dev/null | wc -l)"
+        LOCAL_COUNT=$(ls -1 "$ISO_DIR"/*.iso 2>/dev/null | wc -l)
+        PVE_COUNT=0
+        [ -d "$PVE_ISO_DIR" ] && PVE_COUNT=$(ls -1 "$PVE_ISO_DIR"/*.iso 2>/dev/null | wc -l)
+        echo -e "ISOs cadastradas:                 $((LOCAL_COUNT + PVE_COUNT)) (Local: $LOCAL_COUNT, Proxmox: $PVE_COUNT)"
         echo -e "${CYAN}====================================================${NC}"
         ;;
     mode)
@@ -62,7 +71,7 @@ case "${1:-}" in
         ;;
     *)
         echo -e "${CYAN}ProxPXE Manager - Comandos disponíveis:${NC}"
-        echo -e "  ${GREEN}proxpxe scan${NC}       - Escaneia a pasta /data/iso e regenera menus GRUB/iPXE"
+        echo -e "  ${GREEN}proxpxe scan${NC}       - Escaneia as ISOs e regenera menus GRUB/Syslinux/iPXE"
         echo -e "  ${GREEN}proxpxe theme${NC}      - Atualiza layout, logo e converte fontes .ttf para .pf2"
         echo -e "  ${GREEN}proxpxe list${NC}       - Exibe as ISOs cadastradas"
         echo -e "  ${GREEN}proxpxe status${NC}     - Exibe status dos serviços e rede"

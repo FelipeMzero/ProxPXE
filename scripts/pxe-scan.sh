@@ -15,15 +15,37 @@ CONFIG_DIR="${CONFIG_DIR:-/data/config}"
 
 GRUB_CFG="$TFTP_DIR/grub/grub.cfg"
 IPXE_CFG="$TFTP_DIR/menu.ipxe"
+SYS_CFG="$TFTP_DIR/bios/pxelinux.cfg/default"
 JSON_OUT="$CONFIG_DIR/isos.json"
 
-mkdir -p "$ISO_DIR" "$PVE_ISO_DIR" "$EXTRACTED_DIR" "$THEME_DIR" "$CONFIG_DIR" "$TFTP_DIR/grub" "$TFTP_DIR/uefi" "$TFTP_DIR/bios"
+mkdir -p "$ISO_DIR" "$PVE_ISO_DIR" "$EXTRACTED_DIR" "$THEME_DIR" "$CONFIG_DIR" \
+         "$TFTP_DIR/grub" "$TFTP_DIR/uefi" "$TFTP_DIR/bios/pxelinux.cfg" "$TFTP_DIR/pxelinux.cfg"
 
 # Detecta IP do servidor
 SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "192.168.1.100")
 SERVER_IP=${SERVER_IP:-"192.168.1.100"}
 
 echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR e $PVE_ISO_DIR..."
+
+# Inicia cabeçalho do pxelinux.cfg/default (BIOS Legacy)
+cat << 'EOF' > "$SYS_CFG"
+DEFAULT menu.c32
+PROMPT 0
+TIMEOUT 150
+ONTIMEOUT 1
+
+MENU TITLE ProxPXE - Hospital Regional Menino Jesus (BIOS)
+MENU COLOR border       30;44   #40ffffff #a0000000 std
+MENU COLOR title        1;36;44 #ffffffff #a0000000 std
+MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all
+MENU COLOR unsel        37;44   #50ffffff #a0000000 std
+MENU COLOR help         37;40   #c0ffffff #a0000000 std
+
+LABEL -
+    MENU LABEL  *** SERVIDOR PROXPXE - HOSPITAL REGIONAL MENINO JESUS ***
+    MENU DISABLE
+
+EOF
 
 # Inicia cabeçalho do grub.cfg
 cat << 'EOF' > "$GRUB_CFG"
@@ -228,6 +250,45 @@ EOF
     echo "}" >> "$GRUB_CFG"
     echo "" >> "$GRUB_CFG"
 
+    # --- Entrada no PXELINUX (BIOS Legacy) ---
+    cat << EOF >> "$SYS_CFG"
+LABEL iso_$ISO_COUNT
+    MENU LABEL $ISO_COUNT. $os_title [$iso_source]
+EOF
+
+    if [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$SYS_CFG"
+    KERNEL http://$SERVER_IP/extracted/$rel_kernel
+    INITRD http://$SERVER_IP/extracted/$rel_initrd
+    APPEND ip=dhcp url=http://$SERVER_IP/$http_dir/$iso_name ds=nocloud-net ---
+EOF
+    elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$SYS_CFG"
+    KERNEL http://$SERVER_IP/extracted/$rel_kernel
+    INITRD http://$SERVER_IP/extracted/$rel_initrd
+    APPEND boot=live components fetch=http://$SERVER_IP/$http_dir/$iso_name
+EOF
+    elif [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$SYS_CFG"
+    KERNEL http://$SERVER_IP/extracted/$rel_kernel
+    INITRD http://$SERVER_IP/extracted/$rel_initrd
+    APPEND vga=791 splash=silent ip=dhcp
+EOF
+    elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$SYS_CFG"
+    KERNEL http://$SERVER_IP/extracted/$rel_kernel
+    INITRD http://$SERVER_IP/extracted/$rel_initrd
+    APPEND boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$iso_name
+EOF
+    else
+        cat << EOF >> "$SYS_CFG"
+    KERNEL memdisk
+    INITRD http://$SERVER_IP/$http_dir/$iso_name
+    APPEND iso raw
+EOF
+    fi
+    echo "" >> "$SYS_CFG"
+
     # --- Gera Entrada no iPXE ---
     echo "item iso_$ISO_COUNT $os_title [$iso_source]" >> "$IPXE_CFG"
 
@@ -269,6 +330,29 @@ submenu ">> Ferramentas e Opcoes Avancadas" --class tool {
 }
 EOF
 
+# Rodapé do PXELINUX (BIOS Legacy)
+cat << 'EOF' >> "$SYS_CFG"
+LABEL -
+    MENU LABEL  ------------------------------------------------
+    MENU DISABLE
+
+LABEL ipxe
+    MENU LABEL >> Iniciar iPXE (HTTP Boot)
+    KERNEL /bios/undionly.kpxe
+
+LABEL reboot
+    MENU LABEL >> Reiniciar Computador
+    COM32 reboot.c32
+
+LABEL poweroff
+    MENU LABEL >> Desligar Computador
+    COM32 poweroff.c32
+EOF
+
+# Espelha pxelinux.cfg para todos os caminhos procurados pelo Syslinux
+cp "$SYS_CFG" "$TFTP_DIR/pxelinux.cfg/default" 2>/dev/null || true
+cp "$SYS_CFG" "$TFTP_DIR/default" 2>/dev/null || true
+
 # Espelha o grub.cfg para caminhos procurados por clientes UEFI e TFTP
 cp "$GRUB_CFG" "$TFTP_DIR/uefi/grub.cfg" 2>/dev/null || true
 cp "$GRUB_CFG" "$TFTP_DIR/grub.cfg" 2>/dev/null || true
@@ -297,4 +381,4 @@ EOF
 chmod -R 777 "$TFTP_DIR" 2>/dev/null || true
 chown -R dnsmasq:dnsmasq "$TFTP_DIR" 2>/dev/null || chown -R nobody:nogroup "$TFTP_DIR" 2>/dev/null || true
 
-echo "==> [PXE-SCAN] Concluído! $ISO_COUNT ISOs registradas em $GRUB_CFG e $IPXE_CFG"
+echo "==> [PXE-SCAN] Concluído! $ISO_COUNT ISOs registradas em GRUB (UEFI), Syslinux (BIOS) e iPXE."

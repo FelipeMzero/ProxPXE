@@ -112,6 +112,7 @@ mkdir -p /var/lib/tftpboot/grub/x86_64-efi
 cp /var/lib/tftpboot/uefi/grubnetx64.efi /var/lib/tftpboot/grub/x86_64-efi/core.efi 2>/dev/null || true
 
 # Syslinux / BIOS Legacy
+mkdir -p /var/lib/tftpboot/bios/pxelinux.cfg /var/lib/tftpboot/pxelinux.cfg
 if [ -f /usr/lib/PXELINUX/lpxelinux.0 ]; then
     cp /usr/lib/PXELINUX/lpxelinux.0 /var/lib/tftpboot/bios/lpxelinux.0
     cp /usr/lib/PXELINUX/lpxelinux.0 /var/lib/tftpboot/lpxelinux.0 2>/dev/null || true
@@ -120,15 +121,15 @@ elif [ -f /usr/lib/PXELINUX/pxelinux.0 ]; then
     cp /usr/lib/PXELINUX/pxelinux.0 /var/lib/tftpboot/lpxelinux.0 2>/dev/null || true
 fi
 
-for mod in ldlinux.c32 menu.c32 vesamenu.c32 libcom32.c32 libutil.c32 chain.c32; do
-    find /usr/lib/syslinux -name "$mod" -exec cp {} /var/lib/tftpboot/bios/ \; 2>/dev/null || true
-    find /usr/lib/syslinux -name "$mod" -exec cp {} /var/lib/tftpboot/ \; 2>/dev/null || true
-done
+# Copia todos os módulos .c32 do Syslinux (menu, vesamenu, ldlinux, libcom32, libutil, chain, reboot, poweroff, etc.)
+find /usr/lib/syslinux -name "*.c32" -exec cp {} /var/lib/tftpboot/bios/ \; 2>/dev/null || true
+find /usr/lib/syslinux -name "*.c32" -exec cp {} /var/lib/tftpboot/ \; 2>/dev/null || true
 
 # iPXE & Memdisk
 find /usr/lib/ipxe -name "undionly.kpxe" -exec cp {} /var/lib/tftpboot/bios/undionly.kpxe \; 2>/dev/null || true
 find /usr/lib/ipxe -name "undionly.kpxe" -exec cp {} /var/lib/tftpboot/undionly.kpxe \; 2>/dev/null || true
 find /usr/lib/syslinux -name "memdisk" -exec cp {} /var/lib/tftpboot/memdisk \; 2>/dev/null || true
+find /usr/lib/syslinux -name "memdisk" -exec cp {} /var/lib/tftpboot/bios/memdisk \; 2>/dev/null || true
 
 # Permissões irrestritas no TFTP para evitar erro PXE-E23 / 0 Bytes
 chmod -R 777 /var/lib/tftpboot
