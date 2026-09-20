@@ -112,35 +112,10 @@ fi
 # Gera tema inicial e converte fontes
 bash "$TARGET_DIR/scripts/pxe-theme.sh"
 
-log_step "5/6: Configurando Dnsmasq (ProxyDHCP + TFTP) e Nginx..."
-HOST_IP=$(hostname -I | awk '{print $1}')
+log_step "5/6: Configurando Dnsmasq (ProxyDHCP Dinâmico) e Nginx..."
 
-cat << EOF > /etc/dnsmasq.d/pxe.conf
-# Proxmox PXE - Modo ProxyDHCP (Porta 4011 - Não afeta o roteador principal)
-port=0
-enable-tftp
-tftp-root=/var/lib/tftpboot
-tftp-secure
-tftp-max=100
-log-dhcp
-log-facility=/var/log/dnsmasq.log
-
-dhcp-range=$HOST_IP,proxy,255.255.255.0
-
-dhcp-match=set:bios,option:client-arch,0
-dhcp-match=set:efi-ia32,option:client-arch,6
-dhcp-match=set:efi-x64,option:client-arch,7
-dhcp-match=set:efi-x64,option:client-arch,9
-dhcp-match=set:efi-arm64,option:client-arch,11
-
-dhcp-boot=tag:bios,bios/lpxelinux.0,$HOST_IP
-dhcp-boot=tag:efi-ia32,uefi/grubnetia32.efi,$HOST_IP
-dhcp-boot=tag:efi-x64,uefi/grubnetx64.efi,$HOST_IP
-
-pxe-prompt="Inicializando PXE Ventoy Proxmox...", 2
-pxe-service=tag:bios,x86PC,"Proxmox PXE Ventoy (BIOS)",bios/lpxelinux.0
-pxe-service=tag:efi-x64,X86-64_EFI,"Proxmox PXE Ventoy (UEFI)",uefi/grubnetx64.efi
-EOF
+# Auto-detecta a rede onde o CT está conectado (estática ou DHCP) e gera dnsmasq.conf dinâmico
+bash "$TARGET_DIR/scripts/pxe-network.sh" apply
 
 # Nginx
 cp "$TARGET_DIR/configs/nginx.conf" /etc/nginx/sites-available/pxe-server.conf

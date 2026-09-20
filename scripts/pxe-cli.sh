@@ -49,11 +49,9 @@ case "${1:-}" in
     mode)
         MODE="${2:-}"
         if [ "$MODE" = "proxy" ]; then
-            echo -e "${YELLOW}Configurando Dnsmasq para modo ProxyDHCP (Seguro)...${NC}"
-            SERVER_IP=$(hostname -I | awk '{print $1}')
-            sed -i "s/^dhcp-range=.*/dhcp-range=$SERVER_IP,proxy,255.255.255.0/" /etc/dnsmasq.d/pxe.conf 2>/dev/null || true
-            systemctl restart dnsmasq 2>/dev/null || true
-            echo -e "${GREEN}Modo ProxyDHCP ativado com sucesso!${NC}"
+            echo -e "${YELLOW}Detectando rede e configurando Dnsmasq para modo ProxyDHCP Dinâmico...${NC}"
+            bash "$SCRIPT_DIR/pxe-network.sh" apply
+            echo -e "${GREEN}Modo ProxyDHCP ativado com sucesso para a rede atual!${NC}"
         elif [ "$MODE" = "standalone" ]; then
             echo -e "${YELLOW}Configurando Dnsmasq para Servidor DHCP Completo...${NC}"
             systemctl restart dnsmasq 2>/dev/null || true

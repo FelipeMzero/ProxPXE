@@ -14,7 +14,8 @@ mkdir -p "$ISO_DIR" "$THEME_DIR"
 
 echo "==> [PXE-WATCH] Iniciando monitor de eventos em $ISO_DIR e $THEME_DIR..."
 
-# Executa escaneamento e tema iniciais
+# Executa detecção de rede, tema e escaneamento iniciais
+bash "$SCRIPT_DIR/pxe-network.sh" apply || true
 bash "$SCRIPT_DIR/pxe-theme.sh" || true
 bash "$SCRIPT_DIR/pxe-scan.sh" || true
 
