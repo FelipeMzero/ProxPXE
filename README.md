@@ -38,6 +38,10 @@ Acesse no navegador: **`http://<IP_DO_CONTAINER>`**
 
 ## 🌟 Principais Recursos do ProxPXE
 
+- **Tema Claro Editável (.ini) - Hospital Regional Menino Jesus:**
+  - Identidade visual limpa em **Branco e Azul** inspirada no padrão hospitalar.
+  - **100% Customizável via arquivo `.ini`:** Todas as cores, fontes, títulos e resolução ficam em `/data/config/theme.ini`. Qualquer pessoa pode abrir e editar!
+  - **Editor Integrado no Painel Web:** Altere o arquivo `.ini` diretamente no navegador e aplique com 1 clique!
 - **Fonte Padrão: Outfit:**
   - Fonte moderna e geométrica configurada como padrão tanto no **Menu Ventoy (GRUB2)** quanto na **Interface Web**.
 - **Descarregar ISO Diretamente via URL:**

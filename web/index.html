@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProxPXE - Servidor PXE Proxmox</title>
-    <!-- Google Font: Outfit (Fonte Padrão Solicitada) -->
+    <title>ProxPXE - Hospital Regional Menino Jesus</title>
+    
+    <!-- Google Font: Outfit (Fonte Padrão) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -15,15 +16,31 @@
     
     <script>
         tailwind.config = {
-            darkMode: 'class',
             theme: {
                 extend: {
                     fontFamily: {
                         sans: ['Outfit', 'sans-serif'],
                     },
                     colors: {
-                        dark: { 950: '#070b14', 900: '#0b0f19', 800: '#111827', 700: '#1f2937', 600: '#374151' },
-                        brand: { 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8' }
+                        medical: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7', // Azul Hospital Menino Jesus
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e'
+                        },
+                        slate: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a'
+                        }
                     }
                 }
             }
@@ -34,66 +51,66 @@
         .ventoy-screen { background-size: cover; background-position: center; }
     </style>
 </head>
-<body class="bg-dark-950 text-slate-100 min-h-screen flex flex-col font-sans">
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col font-sans">
 
-    <!-- LOGIN OVERLAY (admin / admin) -->
-    <div id="login-modal" class="fixed inset-0 bg-dark-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
-        <div class="bg-dark-900 border border-dark-700 rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6 relative overflow-hidden">
-            <div class="absolute -top-24 -right-24 w-48 h-48 bg-brand-600/20 rounded-full blur-3xl"></div>
+    <!-- LOGIN MODAL (admin / admin) -->
+    <div id="login-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6 relative overflow-hidden">
+            <div class="absolute -top-20 -right-20 w-40 h-40 bg-medical-500/10 rounded-full blur-2xl"></div>
             
             <div class="text-center space-y-2">
-                <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-brand-500/20">
-                    <i class="fa-solid fa-shield-halved"></i>
+                <div class="w-16 h-16 mx-auto rounded-2xl bg-medical-600 text-white flex items-center justify-center text-2xl font-bold shadow-lg shadow-medical-600/30">
+                    <i class="fa-solid fa-hospital"></i>
                 </div>
-                <h2 class="text-2xl font-bold text-white tracking-tight">Painel ProxPXE</h2>
-                <p class="text-xs text-slate-400">Entre com suas credenciais de administrador</p>
-                <div class="bg-dark-800/80 p-2 rounded-lg border border-dark-700 text-xs text-emerald-400 font-mono">
-                    Usuário Padrão: <strong>admin</strong> | Senha: <strong>admin</strong>
+                <h2 class="text-2xl font-bold text-slate-900 tracking-tight">ProxPXE</h2>
+                <p class="text-xs text-medical-700 font-semibold uppercase tracking-wider">Hospital Regional Menino Jesus</p>
+                <div class="bg-medical-50 text-medical-800 p-2.5 rounded-xl border border-medical-200 text-xs font-medium">
+                    Usuário Padrão: <strong>admin</strong> &nbsp;|&nbsp; Senha: <strong>admin</strong>
                 </div>
             </div>
 
             <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4 text-xs">
                 <div>
-                    <label class="block text-slate-300 font-medium mb-1">Usuário</label>
-                    <input type="text" id="login-user" value="admin" class="w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-white focus:outline-none focus:border-brand-500" required>
+                    <label class="block text-slate-700 font-semibold mb-1">Usuário</label>
+                    <input type="text" id="login-user" value="admin" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-medical-600 font-medium" required>
                 </div>
                 <div>
-                    <label class="block text-slate-300 font-medium mb-1">Senha</label>
-                    <input type="password" id="login-pass" value="admin" class="w-full bg-dark-800 border border-dark-600 rounded-xl p-3 text-white focus:outline-none focus:border-brand-500" required>
+                    <label class="block text-slate-700 font-semibold mb-1">Senha</label>
+                    <input type="password" id="login-pass" value="admin" class="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-slate-900 focus:outline-none focus:border-medical-600 font-medium" required>
                 </div>
-                <button type="submit" class="w-full bg-brand-600 hover:bg-brand-500 text-white font-semibold py-3 rounded-xl shadow-lg transition flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Acessar Painel
+                <button type="submit" class="w-full bg-medical-600 hover:bg-medical-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-medical-600/20 transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i> Acessar Sistema
                 </button>
             </form>
         </div>
     </div>
 
-    <!-- MAIN HEADER -->
-    <header class="border-b border-dark-700 bg-dark-900/90 backdrop-blur sticky top-0 z-40">
+    <!-- MAIN HEADER (Claro - Branco & Azul) -->
+    <header class="border-b border-slate-200 bg-white sticky top-0 z-40 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white font-bold shadow-lg shadow-brand-500/20">
-                    <i class="fa-solid fa-server text-lg"></i>
+            <div class="flex items-center space-x-3.5">
+                <div class="w-10 h-10 rounded-xl bg-medical-600 flex items-center justify-center text-white font-bold shadow-md shadow-medical-600/20">
+                    <i class="fa-solid fa-hospital text-lg"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                        ProxPXE <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">Ventoy Edition</span>
+                    <h1 class="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
+                        ProxPXE <span class="text-xs px-2.5 py-0.5 rounded-full bg-medical-100 text-medical-800 border border-medical-200 font-semibold">Hospital Menino Jesus</span>
                     </h1>
-                    <p class="text-[11px] text-slate-400">Boot de Rede PXE com Fonte Outfit & Modo ProxyDHCP</p>
+                    <p class="text-[11px] text-slate-500">Servidor de Boot PXE • Tema Claro Editável (.ini)</p>
                 </div>
             </div>
 
-            <div class="flex items-center space-x-4">
-                <div class="bg-dark-800 px-3 py-1.5 rounded-lg border border-dark-700 flex items-center space-x-2 text-xs">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span class="text-slate-400">IP:</span>
-                    <span id="header-ip" class="font-mono text-emerald-400 font-semibold">127.0.0.1</span>
+            <div class="flex items-center space-x-3">
+                <div class="bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 flex items-center space-x-2 text-xs">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-slate-500 font-medium">IP Servidor:</span>
+                    <span id="header-ip" class="font-mono text-medical-700 font-bold">127.0.0.1</span>
                 </div>
-                <button onclick="rebuildMenus()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs px-3.5 py-2 rounded-lg font-medium transition flex items-center gap-2 shadow-sm">
+                <button onclick="rebuildMenus()" class="bg-medical-600 hover:bg-medical-700 text-white text-xs px-3.5 py-2 rounded-xl font-medium transition flex items-center gap-2 shadow-sm">
                     <i class="fa-solid fa-arrows-rotate" id="sync-icon"></i>
                     <span>Regenerar Menu PXE</span>
                 </button>
-                <button onclick="logout()" class="text-xs text-slate-400 hover:text-red-400 px-2 py-1 rounded" title="Sair">
+                <button onclick="logout()" class="text-xs text-slate-400 hover:text-red-500 p-2 rounded-lg hover:bg-slate-100 transition" title="Sair">
                     <i class="fa-solid fa-power-off"></i>
                 </button>
             </div>
@@ -103,226 +120,194 @@
     <!-- MAIN BODY -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
 
-        <!-- Top Metrics Cards -->
+        <!-- METRIC CARDS -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-dark-900 p-4 rounded-2xl border border-dark-700 flex items-center justify-between">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Modo de Rede</p>
-                    <p class="text-lg font-bold text-white mt-1">ProxyDHCP</p>
-                    <span class="text-[11px] text-emerald-400 flex items-center gap-1 mt-0.5">
-                        <i class="fa-solid fa-circle-check"></i> Sem conflito com roteador
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Modo de Operação</p>
+                    <p class="text-lg font-bold text-slate-900 mt-1">ProxyDHCP (4011)</p>
+                    <span class="text-[11px] text-emerald-600 font-medium flex items-center gap-1 mt-0.5">
+                        <i class="fa-solid fa-circle-check"></i> Seguro para a rede hospitalar
                     </span>
                 </div>
-                <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl border border-emerald-100">
                     <i class="fa-solid fa-shield-halved"></i>
                 </div>
             </div>
 
-            <div class="bg-dark-900 p-4 rounded-2xl border border-dark-700 flex items-center justify-between">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">ISOs Cadastradas</p>
-                    <p id="dash-iso-count" class="text-lg font-bold text-white mt-1">0</p>
-                    <span class="text-[11px] text-slate-400 mt-0.5 block">Prontas para boot PXE</span>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Imagens ISO</p>
+                    <p id="dash-iso-count" class="text-lg font-bold text-slate-900 mt-1">0</p>
+                    <span class="text-[11px] text-slate-500 mt-0.5 block">Disponíveis para boot</span>
                 </div>
-                <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-medical-50 text-medical-600 flex items-center justify-center text-xl border border-medical-100">
                     <i class="fa-solid fa-compact-disc"></i>
                 </div>
             </div>
 
-            <div class="bg-dark-900 p-4 rounded-2xl border border-dark-700 flex items-center justify-between">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Armazenamento (/data)</p>
-                    <p id="dash-disk-used" class="text-lg font-bold text-white mt-1">--</p>
-                    <span id="dash-disk-free" class="text-[11px] text-slate-400 mt-0.5 block">-- livres</span>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Armazenamento (/data)</p>
+                    <p id="dash-disk-used" class="text-lg font-bold text-slate-900 mt-1">--</p>
+                    <span id="dash-disk-free" class="text-[11px] text-slate-500 mt-0.5 block">-- livres</span>
                 </div>
-                <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl border border-blue-100">
                     <i class="fa-solid fa-hard-drive"></i>
                 </div>
             </div>
 
-            <div class="bg-dark-900 p-4 rounded-2xl border border-dark-700 flex items-center justify-between">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Computadores Ativos</p>
-                    <p id="dash-clients-count" class="text-lg font-bold text-white mt-1">0</p>
-                    <span class="text-[11px] text-brand-400 mt-0.5 block">Conectados na rede</span>
+                    <p class="text-xs text-slate-500 font-semibold uppercase tracking-wider">Computadores Ativos</p>
+                    <p id="dash-clients-count" class="text-lg font-bold text-slate-900 mt-1">0</p>
+                    <span class="text-[11px] text-medical-600 mt-0.5 block">Conectados no PXE</span>
                 </div>
-                <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 text-xl">
+                <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl border border-purple-100">
                     <i class="fa-solid fa-network-wired"></i>
                 </div>
             </div>
         </div>
 
-        <!-- CLIENT INSTALLATION STATUS IN REAL TIME (%) -->
-        <div class="bg-dark-900 p-5 rounded-2xl border border-dark-700 space-y-4">
+        <!-- REAL TIME INSTALLATION STATUS OF COMPUTERS (%) -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-laptop-code text-brand-400"></i>
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-laptop-medical text-medical-600"></i>
                         Computadores em Processo de Instalação / Conectados
                     </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Acompanhe a porcentagem de instalação e transferência de imagens em tempo real.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Acompanhamento do percentual de instalação e transferência de imagens em tempo real.</p>
                 </div>
-                <button onclick="fetchClients()" class="text-xs bg-dark-800 hover:bg-dark-700 px-3 py-1.5 rounded-lg border border-dark-700 text-slate-300 flex items-center gap-1.5">
+                <button onclick="fetchClients()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-medium flex items-center gap-1.5 transition">
                     <i class="fa-solid fa-rotate-right"></i> Atualizar Clientes
                 </button>
             </div>
 
             <div id="clients-list" class="space-y-3">
-                <div class="p-6 text-center text-slate-500 text-xs">
-                    <i class="fa-solid fa-laptop text-2xl mb-2 opacity-40 block"></i>
-                    Nenhum computador em processo de instalação no momento. Ao dar boot em um PC, ele aparecerá aqui!
+                <div class="p-6 text-center text-slate-400 text-xs">
+                    <i class="fa-solid fa-laptop-medical text-2xl mb-2 opacity-30 block text-medical-600"></i>
+                    Nenhum computador iniciando instalação no momento. Quando um computador da rede der boot via PXE, ele aparecerá aqui com a porcentagem (%)!
                 </div>
             </div>
         </div>
 
-        <!-- DOWNLOAD VIA URL & DIRECT UPLOAD -->
+        <!-- URL DOWNLOAD & DIRECT UPLOAD -->
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            <!-- Download ISO via URL -->
-            <div class="bg-dark-900 p-5 rounded-2xl border border-dark-700 space-y-4">
+            <!-- Download via URL -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div>
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-cloud-arrow-down text-emerald-400"></i>
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-down text-emerald-600"></i>
                         Descarregar ISO Diretamente via URL
                     </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Cole o link direto da ISO oficial (Ubuntu, Windows, Proxmox, etc.).</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Cole o link direto da ISO que deseja baixar no servidor.</p>
                 </div>
 
                 <form onsubmit="startUrlDownload(event)" class="space-y-3 text-xs">
                     <div>
-                        <label class="block text-slate-300 font-medium mb-1">URL Direta da ISO</label>
-                        <input type="url" id="dl-url" placeholder="https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso" class="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-white font-mono text-xs focus:border-brand-500" required>
+                        <label class="block text-slate-700 font-medium mb-1">URL Direta da ISO</label>
+                        <input type="url" id="dl-url" placeholder="https://releases.ubuntu.com/24.04/ubuntu-24.04-live-server-amd64.iso" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 font-mono text-xs focus:border-medical-600 focus:bg-white" required>
                     </div>
                     <div>
-                        <label class="block text-slate-300 font-medium mb-1">Nome do Arquivo (Opcional)</label>
-                        <input type="text" id="dl-name" placeholder="ubuntu-24.04.iso" class="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-white font-mono text-xs focus:border-brand-500">
+                        <label class="block text-slate-700 font-medium mb-1">Nome do Arquivo (Opcional)</label>
+                        <input type="text" id="dl-name" placeholder="ubuntu-24.04.iso" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-slate-900 font-mono text-xs focus:border-medical-600 focus:bg-white">
                     </div>
-                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl transition flex items-center justify-center gap-2">
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm">
                         <i class="fa-solid fa-download"></i> Iniciar Download no Servidor
                     </button>
                 </form>
 
                 <!-- Download Progress Box -->
-                <div id="dl-progress-box" class="hidden bg-dark-800/80 p-3.5 rounded-xl border border-dark-700 space-y-2 text-xs">
-                    <div class="flex justify-between items-center text-slate-300">
+                <div id="dl-progress-box" class="hidden bg-emerald-50/60 p-3.5 rounded-xl border border-emerald-200 space-y-2 text-xs">
+                    <div class="flex justify-between items-center text-slate-800">
                         <span id="dl-filename" class="font-mono font-medium truncate max-w-[200px]">arquivo.iso</span>
-                        <span id="dl-speed" class="text-emerald-400 font-mono">0 MB/s</span>
+                        <span id="dl-speed" class="text-emerald-700 font-bold font-mono">0 MB/s</span>
                     </div>
-                    <div class="w-full bg-dark-950 h-2.5 rounded-full overflow-hidden">
-                        <div id="dl-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div class="w-full bg-emerald-200/50 h-2.5 rounded-full overflow-hidden">
+                        <div id="dl-bar" class="bg-emerald-600 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
                     </div>
-                    <div class="flex justify-between items-center text-[11px] text-slate-400">
+                    <div class="flex justify-between items-center text-[11px] text-slate-600">
                         <span id="dl-status">Baixando...</span>
                         <div class="flex items-center gap-3">
-                            <span id="dl-pct" class="font-bold text-white">0%</span>
-                            <button onclick="cancelDownload()" class="text-red-400 hover:text-red-300 font-medium">Cancelar</button>
+                            <span id="dl-pct" class="font-bold text-emerald-800">0%</span>
+                            <button onclick="cancelDownload()" class="text-red-600 hover:text-red-700 font-semibold">Cancelar</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Direct ISO Upload -->
-            <div class="bg-dark-900 p-5 rounded-2xl border border-dark-700 space-y-4">
+            <!-- Direct Upload -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
                 <div>
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-upload text-brand-400"></i>
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-upload text-medical-600"></i>
                         Upload de ISO do seu Computador
                     </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Envie arquivos .iso ou .img salvos na sua máquina.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Envie arquivos .iso salvos no seu computador.</p>
                 </div>
 
-                <div class="border-2 border-dashed border-dark-700 hover:border-brand-500 rounded-2xl p-6 text-center cursor-pointer relative transition">
+                <div class="border-2 border-dashed border-slate-200 hover:border-medical-500 bg-slate-50/50 rounded-2xl p-6 text-center cursor-pointer relative transition">
                     <input type="file" id="upload-file-input" accept=".iso,.img" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onchange="handleFileUpload(event)">
                     <div class="space-y-2 pointer-events-none">
-                        <div class="w-12 h-12 mx-auto rounded-full bg-brand-500/10 text-brand-400 flex items-center justify-center text-xl">
+                        <div class="w-12 h-12 mx-auto rounded-2xl bg-medical-50 text-medical-600 flex items-center justify-center text-xl border border-medical-100">
                             <i class="fa-solid fa-file-arrow-up"></i>
                         </div>
-                        <p class="text-xs font-semibold text-white">Clique ou arraste um arquivo ISO aqui</p>
-                        <p class="text-[11px] text-slate-400">Suporta Windows, Linux, Proxmox e imagens de resgate</p>
+                        <p class="text-xs font-semibold text-slate-800">Clique ou arraste um arquivo ISO aqui</p>
+                        <p class="text-[11px] text-slate-500">Imagens ISO de instalação ou ferramentas hospitalares</p>
                     </div>
                 </div>
 
-                <div id="upload-status-box" class="hidden bg-dark-800 p-3 rounded-xl border border-dark-700 text-xs space-y-1.5">
-                    <div class="flex justify-between text-slate-300">
+                <div id="upload-status-box" class="hidden bg-medical-50 p-3 rounded-xl border border-medical-200 text-xs space-y-1.5">
+                    <div class="flex justify-between text-slate-700 font-medium">
                         <span id="up-filename">Enviando...</span>
-                        <span id="up-pct">0%</span>
+                        <span id="up-pct" class="text-medical-700 font-bold">0%</span>
                     </div>
-                    <div class="w-full bg-dark-950 h-2 rounded-full overflow-hidden">
-                        <div id="up-bar" class="bg-brand-500 h-full rounded-full transition-all" style="width: 0%"></div>
+                    <div class="w-full bg-medical-200 h-2 rounded-full overflow-hidden">
+                        <div id="up-bar" class="bg-medical-600 h-full rounded-full transition-all" style="width: 0%"></div>
                     </div>
                 </div>
             </div>
 
         </div>
 
-        <!-- DETAILED DISK ANALYSIS (/data) -->
-        <div class="bg-dark-900 p-5 rounded-2xl border border-dark-700 space-y-4">
+        <!-- VENTOY LIGHT SIMULATOR SCREEN (WHITE & BLUE) -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-pie-chart text-amber-400"></i>
-                        Análise de Disco e Armazenamento (/data)
-                    </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Distribuição do espaço utilizado por imagens ISO e sistema.</p>
-                </div>
-                <button onclick="fetchDiskAnalysis()" class="text-xs bg-dark-800 hover:bg-dark-700 px-3 py-1.5 rounded-lg border border-dark-700 text-slate-300">
-                    <i class="fa-solid fa-arrows-rotate"></i> Analisar Disco
-                </button>
-            </div>
-
-            <!-- Disk Usage Bar -->
-            <div class="space-y-1.5">
-                <div class="flex justify-between text-xs text-slate-300">
-                    <span>Espaço em Uso: <strong id="disk-used-val">0 GB</strong></span>
-                    <span>Espaço Livre: <strong id="disk-free-val" class="text-emerald-400">0 GB</strong></span>
-                </div>
-                <div class="w-full bg-dark-800 h-3.5 rounded-full overflow-hidden flex">
-                    <div id="disk-bar-iso" class="bg-blue-500 h-full transition-all" style="width: 0%" title="ISOs"></div>
-                    <div id="disk-bar-ext" class="bg-purple-500 h-full transition-all" style="width: 0%" title="Kernels Extraídos"></div>
-                </div>
-                <div class="flex items-center gap-4 text-[11px] text-slate-400 pt-1">
-                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span> ISOs Armazenadas</span>
-                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span> Kernels de Live-Boot</span>
-                    <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-dark-800 inline-block"></span> Espaço Disponível</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- SIMULATED VENTOY BOOT SCREEN (OUTFIT FONT) -->
-        <div class="bg-dark-900 p-6 rounded-2xl border border-dark-700 space-y-4">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-display text-brand-400"></i>
-                        Simulador da Tela de Boot Ventoy (Fonte Padrão: Outfit)
+                    <h2 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-display text-medical-600"></i>
+                        Simulador da Tela de Boot Ventoy (Tema Claro Menino Jesus)
                     </h2>
-                    <p class="text-xs text-slate-400 mt-0.5">Exatamente como o menu aparecerá no monitor dos computadores ao iniciar via rede.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Visualização fiel ao que é exibido nos monitores durante o boot de rede.</p>
                 </div>
-                <span class="text-xs text-slate-400 font-mono">1920x1080 Full HD</span>
+                <span class="text-xs bg-medical-50 text-medical-800 font-semibold px-2.5 py-1 rounded-lg border border-medical-200">1920x1080 Full HD</span>
             </div>
 
-            <div class="p-3 bg-black rounded-2xl border-4 border-dark-700 shadow-2xl">
-                <div id="sim-screen" class="ventoy-screen aspect-video w-full rounded-lg relative overflow-hidden flex flex-col justify-between p-6 select-none" style="background-color: #0b0f19; background-image: url('/theme/background.png');">
+            <!-- Monitor Frame -->
+            <div class="p-3 bg-slate-900 rounded-3xl shadow-xl">
+                <div id="sim-screen" class="ventoy-screen aspect-video w-full rounded-2xl relative overflow-hidden flex flex-col justify-between p-6 select-none border border-slate-700" style="background-color: #f8fafc; background-image: url('/theme/background.png');">
                     
-                    <!-- Top Logo -->
+                    <!-- Top Logo (Hospital Menino Jesus) -->
                     <div class="w-full flex justify-center items-center pt-2">
-                        <img id="sim-logo" src="/theme/logo.png" alt="ProxPXE" class="h-12 sm:h-16 object-contain drop-shadow-md" onerror="this.style.display='none'">
+                        <img id="sim-logo" src="/theme/logo.png" alt="ProxPXE" class="h-14 sm:h-16 object-contain drop-shadow" onerror="this.style.display='none'">
                     </div>
 
-                    <!-- Menu Box -->
-                    <div class="w-4/5 mx-auto bg-dark-900/85 backdrop-blur border border-slate-700 rounded-xl p-3 shadow-2xl space-y-1.5 my-auto">
+                    <!-- Central Menu Box (Crisp Light Theme) -->
+                    <div class="w-4/5 mx-auto bg-white/95 backdrop-blur border-2 border-medical-600/30 rounded-2xl p-3 shadow-xl space-y-1.5 my-auto">
                         <div id="sim-menu-items" class="space-y-1 text-xs">
-                            <div class="p-4 text-center text-slate-400 italic">Carregando ISOs...</div>
+                            <div class="p-4 text-center text-slate-400 italic">Carregando imagens...</div>
                         </div>
                     </div>
 
                     <!-- Bottom Bar -->
                     <div class="w-4/5 mx-auto space-y-2 pb-1">
-                        <div class="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
-                            <div class="bg-brand-500 h-full w-2/3 rounded-full"></div>
+                        <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                            <div class="bg-medical-600 h-full w-2/3 rounded-full"></div>
                         </div>
-                        <div class="text-center text-[10px] text-slate-400 font-mono tracking-wider">
-                            [Enter] Iniciar Selecionado &nbsp;|&nbsp; [e] Editar Kernel &nbsp;|&nbsp; [c] Console GRUB &nbsp;|&nbsp; [Esc] Voltar
+                        <div class="text-center text-[11px] text-slate-600 font-medium">
+                            [Enter] Iniciar Selecionado &nbsp;|&nbsp; [e] Editar Parâmetros &nbsp;|&nbsp; Hospital Regional Menino Jesus
                         </div>
                     </div>
 
@@ -330,34 +315,55 @@
             </div>
         </div>
 
-        <!-- ISO LIST TABLE -->
-        <div class="bg-dark-900 rounded-2xl border border-dark-700 overflow-hidden shadow-lg p-5 space-y-4">
+        <!-- EDITABLE THEME.INI SECTION -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-center justify-between">
                 <div>
-                    <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                        <i class="fa-solid fa-compact-disc text-brand-400"></i> Imagens ISO Disponíveis no ProxPXE
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-palette text-medical-600"></i>
+                        Personalização Visual & Editor do Arquivo theme.ini
                     </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">Arquivos armazenados em /data/iso/</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Edite o arquivo .ini diretamente para que outros administradores possam mudar o visual rapidamente.</p>
                 </div>
-                <button onclick="fetchIsos()" class="text-xs bg-dark-800 hover:bg-dark-700 px-3 py-1.5 rounded-lg border border-dark-700 text-slate-300">
+                <button onclick="saveThemeIni()" class="bg-medical-600 hover:bg-medical-700 text-white text-xs px-4 py-2 rounded-xl font-medium transition shadow-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-floppy-disk"></i> Salvar theme.ini & Aplicar
+                </button>
+            </div>
+
+            <div>
+                <textarea id="theme-ini-editor" rows="9" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 font-mono text-xs text-slate-800 focus:outline-none focus:border-medical-600 focus:bg-white leading-relaxed" spellcheck="false"></textarea>
+                <p class="text-[11px] text-slate-400 mt-1">Caminho no servidor: <code class="font-mono text-medical-700 bg-slate-100 px-1 py-0.5 rounded">/data/config/theme.ini</code></p>
+            </div>
+        </div>
+
+        <!-- ISO LIST TABLE -->
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm p-5 space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <i class="fa-solid fa-compact-disc text-medical-600"></i> Imagens ISO Cadastradas no ProxPXE
+                    </h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Arquivos disponíveis na pasta /data/iso/</p>
+                </div>
+                <button onclick="fetchIsos()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-medium">
                     <i class="fa-solid fa-rotate-right"></i> Atualizar Lista
                 </button>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs">
-                    <thead class="bg-dark-800/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-dark-700">
+                    <thead class="bg-slate-50 text-slate-600 uppercase tracking-wider font-semibold border-b border-slate-200">
                         <tr>
-                            <th class="p-3">Ícone</th>
+                            <th class="p-3">Sistema</th>
                             <th class="p-3">Título no Menu Ventoy</th>
                             <th class="p-3">Arquivo</th>
                             <th class="p-3">Tamanho</th>
-                            <th class="p-3 text-right">Ação</th>
+                            <th class="p-3 text-right">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="iso-table-body" class="divide-y divide-dark-700 text-slate-300">
+                    <tbody id="iso-table-body" class="divide-y divide-slate-100 text-slate-700">
                         <tr>
-                            <td colspan="5" class="p-6 text-center text-slate-500">Carregando lista de ISOs...</td>
+                            <td colspan="5" class="p-6 text-center text-slate-400">Carregando lista de ISOs...</td>
                         </tr>
                     </tbody>
                 </table>
@@ -366,24 +372,23 @@
 
     </main>
 
-    <!-- TOAST -->
-    <div id="toast" class="fixed bottom-5 right-5 bg-dark-800 border border-brand-500 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs hidden">
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-2xl shadow-xl z-50 text-xs hidden">
         <span id="toast-msg">Mensagem</span>
     </div>
 
-    <!-- JAVASCRIPT LOGIC -->
+    <!-- SCRIPT -->
     <script>
         let downloadInterval = null;
 
         function showToast(msg, isError = false) {
             const toast = document.getElementById('toast');
             toast.innerText = msg;
-            toast.className = `fixed bottom-5 right-5 ${isError ? 'bg-red-900 border-red-500' : 'bg-dark-800 border-brand-500'} text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs`;
+            toast.className = `fixed bottom-5 right-5 ${isError ? 'bg-red-600' : 'bg-slate-900'} text-white px-4 py-3 rounded-2xl shadow-xl z-50 text-xs flex items-center gap-2`;
             toast.classList.remove('hidden');
             setTimeout(() => toast.classList.add('hidden'), 3500);
         }
 
-        // Auth Logic
         function checkAuth() {
             const token = localStorage.getItem('proxpxe_token');
             if (!token) {
@@ -415,7 +420,6 @@
                     showToast(data.message || 'Credenciais inválidas', true);
                 }
             } catch (err) {
-                // Fallback direct login
                 if (user === 'admin' && pass === 'admin') {
                     localStorage.setItem('proxpxe_token', 'local_admin');
                     document.getElementById('login-modal').classList.add('hidden');
@@ -431,7 +435,6 @@
             location.reload();
         }
 
-        // Data Fetching
         async function fetchStatus() {
             try {
                 const res = await fetch('/api/status');
@@ -442,7 +445,7 @@
                 document.getElementById('dash-disk-free').innerText = `${data.disk.free} livres`;
                 document.getElementById('dash-clients-count').innerText = data.clients_count || 0;
             } catch (e) {
-                console.log("Status offline");
+                console.log("Status error", e);
             }
         }
 
@@ -454,19 +457,19 @@
                 const simBox = document.getElementById('sim-menu-items');
 
                 if (!isos || isos.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-500">Nenhuma ISO encontrada em /data/iso/</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400">Nenhuma ISO encontrada em /data/iso/</td></tr>`;
                     simBox.innerHTML = `<div class="p-4 text-center text-slate-400 italic">[ Nenhuma imagem ISO em /data/iso/ ]</div>`;
                     return;
                 }
 
                 tbody.innerHTML = isos.map(i => `
-                    <tr class="hover:bg-dark-800/50 transition">
-                        <td class="p-3 font-bold uppercase text-brand-400">${i.icon || 'ISO'}</td>
-                        <td class="p-3 font-medium text-white">${i.title}</td>
-                        <td class="p-3 font-mono text-slate-400">${i.filename}</td>
-                        <td class="p-3">${i.size_mb} MB</td>
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3 font-bold uppercase text-medical-600">${i.icon || 'ISO'}</td>
+                        <td class="p-3 font-semibold text-slate-900">${i.title}</td>
+                        <td class="p-3 font-mono text-slate-500">${i.filename}</td>
+                        <td class="p-3 font-medium">${i.size_mb} MB</td>
                         <td class="p-3 text-right">
-                            <button onclick="deleteIso('${i.filename}')" class="text-slate-400 hover:text-red-400 p-1" title="Excluir">
+                            <button onclick="deleteIso('${i.filename}')" class="text-slate-400 hover:text-red-600 p-1" title="Excluir">
                                 <i class="fa-solid fa-trash-can"></i>
                             </button>
                         </td>
@@ -474,9 +477,9 @@
                 `).join('');
 
                 simBox.innerHTML = isos.slice(0, 5).map((iso, idx) => `
-                    <div class="flex items-center justify-between px-3 py-2 rounded-lg ${idx === 0 ? 'bg-brand-600 text-white font-medium shadow' : 'text-slate-300'}">
+                    <div class="flex items-center justify-between px-3 py-2 rounded-xl ${idx === 0 ? 'bg-medical-600 text-white font-semibold shadow-sm' : 'text-slate-700 hover:bg-slate-100'} transition">
                         <div class="flex items-center space-x-2.5">
-                            <span class="w-5 h-5 rounded bg-white/10 flex items-center justify-center text-[10px] uppercase font-bold">${iso.icon[0]}</span>
+                            <span class="w-5 h-5 rounded-md ${idx === 0 ? 'bg-white/20' : 'bg-medical-100 text-medical-800'} flex items-center justify-center text-[10px] uppercase font-bold">${iso.icon[0]}</span>
                             <span>${iso.title}</span>
                         </div>
                         ${idx === 0 ? '<i class="fa-solid fa-chevron-right text-[10px]"></i>' : ''}
@@ -494,32 +497,32 @@
                 const container = document.getElementById('clients-list');
 
                 if (!clients || clients.length === 0) {
-                    container.innerHTML = `<div class="p-6 text-center text-slate-500 text-xs">
-                        <i class="fa-solid fa-laptop text-2xl mb-2 opacity-40 block"></i>
-                        Nenhum computador em processo de instalação no momento. Ao dar boot em um PC, ele aparecerá aqui!
+                    container.innerHTML = `<div class="p-6 text-center text-slate-400 text-xs">
+                        <i class="fa-solid fa-laptop-medical text-2xl mb-2 opacity-30 block text-medical-600"></i>
+                        Nenhum computador iniciando instalação no momento. Ao iniciar um PC pela rede, ele aparecerá aqui com o status em %!
                     </div>`;
                     return;
                 }
 
                 container.innerHTML = clients.map(c => `
-                    <div class="bg-dark-800/70 p-4 rounded-xl border border-dark-700 space-y-2">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2">
                         <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                             <div class="flex items-center gap-2.5">
-                                <div class="w-8 h-8 rounded-lg bg-brand-500/20 text-brand-400 flex items-center justify-center font-bold">
+                                <div class="w-8 h-8 rounded-xl bg-medical-100 text-medical-700 flex items-center justify-center font-bold">
                                     <i class="fa-solid fa-computer"></i>
                                 </div>
                                 <div>
-                                    <div class="font-bold text-white">${c.hostname || c.ip}</div>
-                                    <span class="text-[10px] text-slate-400 font-mono">IP: ${c.ip} | MAC: ${c.mac}</span>
+                                    <div class="font-bold text-slate-900">${c.hostname || c.ip}</div>
+                                    <span class="text-[10px] text-slate-500 font-mono">IP: ${c.ip} | MAC: ${c.mac}</span>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <span class="text-xs font-bold text-emerald-400">${c.percent}%</span>
-                                <div class="text-[10px] text-slate-400">${c.status}</div>
+                                <span class="text-xs font-bold text-medical-700">${c.percent}%</span>
+                                <div class="text-[10px] text-slate-500">${c.status}</div>
                             </div>
                         </div>
-                        <div class="w-full bg-dark-950 h-2 rounded-full overflow-hidden">
-                            <div class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: ${c.percent}%"></div>
+                        <div class="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                            <div class="bg-medical-600 h-full rounded-full transition-all duration-300" style="width: ${c.percent}%"></div>
                         </div>
                     </div>
                 `).join('');
@@ -528,24 +531,33 @@
             }
         }
 
-        async function fetchDiskAnalysis() {
+        async function loadThemeIni() {
             try {
-                const res = await fetch('/api/disk-analysis');
+                const res = await fetch('/api/theme-ini');
                 const data = await res.json();
-                document.getElementById('disk-used-val').innerText = `${data.used_gb} GB (${data.percent})`;
-                document.getElementById('disk-free-val').innerText = `${data.free_gb} GB`;
-
-                const total = parseFloat(data.total_gb) || 1;
-                const isoGb = (data.iso_storage_mb / 1024) || 0;
-                const extGb = (data.extracted_mb / 1024) || 0;
-
-                const isoPct = Math.min(100, Math.round((isoGb / total) * 100));
-                const extPct = Math.min(100, Math.round((extGb / total) * 100));
-
-                document.getElementById('disk-bar-iso').style.width = isoPct + '%';
-                document.getElementById('disk-bar-ext').style.width = extPct + '%';
+                if (data.ini) {
+                    document.getElementById('theme-ini-editor').value = data.ini;
+                }
             } catch (e) {
-                console.log("Disk error", e);
+                console.log("theme.ini error", e);
+            }
+        }
+
+        async function saveThemeIni() {
+            const iniContent = document.getElementById('theme-ini-editor').value;
+            try {
+                const res = await fetch('/api/theme-ini', {
+                    method: 'POST',
+                    body: iniContent
+                });
+                const data = await res.json();
+                showToast(data.message || "Tema salvo!");
+                // Recarrega imagem simulada
+                const t = new Date().getTime();
+                document.getElementById('sim-screen').style.backgroundImage = `url('/theme/background.png?t=${t}')`;
+                document.getElementById('sim-logo').src = `/theme/logo.png?t=${t}`;
+            } catch (e) {
+                showToast("Erro ao salvar theme.ini", true);
             }
         }
 
@@ -588,7 +600,6 @@
                         if (data.status && data.status.includes('concluído')) {
                             showToast("Download da ISO concluído!");
                             fetchIsos();
-                            fetchDiskAnalysis();
                         }
                         clearInterval(downloadInterval);
                         setTimeout(() => document.getElementById('dl-progress-box').classList.add('hidden'), 4000);
@@ -606,7 +617,6 @@
             if (downloadInterval) clearInterval(downloadInterval);
         }
 
-        // Upload File
         function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -629,19 +639,19 @@
                 }
             };
             xhr.onload = () => {
-                showToast("Upload concluído com sucesso!");
+                showToast("Upload concluído!");
                 box.classList.add('hidden');
                 rebuildMenus();
             };
             xhr.onerror = () => {
-                showToast("Erro no envio do arquivo", true);
+                showToast("Erro no envio", true);
                 box.classList.add('hidden');
             };
             xhr.send(file);
         }
 
         async function deleteIso(name) {
-            if (!confirm(`Deseja excluir a ISO ${name}?`)) return;
+            if (!confirm(`Deseja excluir a imagem ${name}?`)) return;
             try {
                 const res = await fetch('/api/delete-iso', {
                     method: 'POST',
@@ -651,7 +661,6 @@
                 const data = await res.json();
                 showToast(data.message);
                 fetchIsos();
-                fetchDiskAnalysis();
             } catch (e) {
                 showToast("Erro ao excluir", true);
             }
@@ -676,7 +685,7 @@
             fetchStatus();
             fetchIsos();
             fetchClients();
-            fetchDiskAnalysis();
+            loadThemeIni();
         }
 
         window.onload = checkAuth;

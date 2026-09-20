@@ -194,6 +194,40 @@ EOF
         fi
         ;;
 
+    *"/api/theme-ini"*)
+        INI_FILE="$CONFIG_DIR/theme.ini"
+        if [ "$METHOD" = "POST" ] && [ -n "$POST_DATA" ]; then
+            # Salva novo conteúdo do .ini
+            echo "$POST_DATA" > "$INI_FILE"
+            bash "$SCRIPT_DIR/pxe-theme.sh" >/dev/null 2>&1 || true
+            cat << 'EOF'
+{
+  "status": "ok",
+  "message": "theme.ini salvo e tema reconstruído com sucesso!"
+}
+EOF
+        else
+            # Retorna o conteúdo do .ini
+            if [ -f "$INI_FILE" ]; then
+                # Escapa para JSON
+                content=$(cat "$INI_FILE")
+                python3 -c "import sys, json; print(json.dumps({'status': 'ok', 'ini': sys.stdin.read()}))" <<< "$content" 2>/dev/null || cat << EOF
+{
+  "status": "ok",
+  "ini": "$(sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' "$INI_FILE" | tr -d '\n')"
+}
+EOF
+            else
+                cat << 'EOF'
+{
+  "status": "error",
+  "message": "theme.ini não encontrado"
+}
+EOF
+            fi
+        fi
+        ;;
+
     *"/api/rebuild"*)
         bash "$SCRIPT_DIR/pxe-theme.sh" >/dev/null 2>&1 || true
         bash "$SCRIPT_DIR/pxe-scan.sh" >/dev/null 2>&1 || true

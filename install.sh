@@ -104,6 +104,11 @@ chmod +x "$TARGET_DIR"/scripts/*.sh
 ln -sf "$TARGET_DIR/scripts/pxe-cli.sh" /usr/local/bin/proxpxe
 ln -sf "$TARGET_DIR/scripts/pxe-cli.sh" /usr/local/bin/pxe-cli
 
+# Copia theme.ini padrão para /data/config se não existir
+if [ ! -f /data/config/theme.ini ] && [ -f "$TARGET_DIR/configs/theme.ini" ]; then
+    cp "$TARGET_DIR/configs/theme.ini" /data/config/theme.ini
+fi
+
 # Gera tema inicial e converte fontes
 bash "$TARGET_DIR/scripts/pxe-theme.sh"
 
