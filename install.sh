@@ -188,6 +188,21 @@ log_step "6/6: Habilitando e iniciando serviços systemd..."
 cp "$TARGET_DIR/configs/pxe-watcher.service" /etc/systemd/system/pxe-watcher.service
 systemctl daemon-reload
 
+# Configura usuário e senha no sistema operacional Linux (admin:admin e root:admin)
+echo "root:admin" | chpasswd 2>/dev/null || true
+if ! id admin &>/dev/null; then
+    useradd -m -s /bin/bash admin 2>/dev/null || true
+fi
+echo "admin:admin" | chpasswd 2>/dev/null || true
+usermod -aG sudo admin 2>/dev/null || true
+
+# Permite login por senha e root caso SSH esteja instalado
+if [ -f /etc/ssh/sshd_config ]; then
+    sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config 2>/dev/null || true
+    sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config 2>/dev/null || true
+    systemctl restart ssh 2>/dev/null || systemctl restart sshd 2>/dev/null || true
+fi
+
 # Inicializa auth.json e diretório de sessões com permissão para o painel web
 mkdir -p /data/config /tmp/proxpxe_sessions
 if [ ! -f /data/config/auth.json ]; then

@@ -44,14 +44,16 @@ pct exec <ID> -- bash -c "rm -rf /tmp/pxe-setup && git clone https://github.com/
 
 ---
 
-## 🔐 Acesso ao Painel Web & Credenciais Padrão
+## 🔐 Acesso ao Container & Credenciais Padrão
 
-Acesse pelo navegador: **`http://<IP_DO_CONTAINER>`**
+- **Painel Web:** `http://<IP_DO_CONTAINER>`
+- **Console Proxmox / SSH:**
+  - **Usuário:** `admin` (ou `root`)
+  - **Senha:** `admin`
+- **Usuário do Painel Web:** `admin`
+- **Senha do Painel Web:** `admin`
 
-- **Usuário Padrão:** `admin`
-- **Senha Padrão:** `admin`
-
-*(Você pode alterar a senha diretamente pelo painel a qualquer momento).*
+*(Você pode alterar as credenciais a qualquer momento).*
 
 ---
 

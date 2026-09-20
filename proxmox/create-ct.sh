@@ -177,15 +177,30 @@ STATIC_IP=""
 STATIC_GW=""
 STATIC_DNS="1.1.1.1"
 
+# Auto-detecta gateway e rede do host Proxmox para preenchimento inteligente
+HOST_DEFAULT_GW=$(ip route show default 2>/dev/null | awk '{print $3}' | head -n1 || true)
+HOST_DEFAULT_GW=${HOST_DEFAULT_GW:-"10.172.0.1"}
+
+DEF_IFACE=$(ip route show default 2>/dev/null | awk '{print $5}' | head -n1 || echo "vmbr0")
+HOST_IP_CIDR=$(ip -o -4 addr show dev "$DEF_IFACE" scope global 2>/dev/null | awk '{print $4}' | head -n1 || true)
+if [ -n "$HOST_IP_CIDR" ]; then
+    SUBNET_PREFIX="${HOST_IP_CIDR%/*}"
+    CIDR_MASK="${HOST_IP_CIDR#*/}"
+    IP_BASE=$(echo "$SUBNET_PREFIX" | awk -F. '{print $1"."$2"."$3}')
+    SUGGESTED_IP="${IP_BASE}.220/${CIDR_MASK}"
+else
+    SUGGESTED_IP="10.172.0.220/16"
+fi
+
 if [ "$NET_CHOICE" = "2" ]; then
     STATIC_IP=$(whiptail --title "$TITLE - IP Estático" \
-        --inputbox "Informe o IP estático com máscara CIDR (Ex: 10.50.2.140/24 ou 192.168.1.50/24):" 10 65 "10.50.2.140/24" 3>&1 1>&2 2>&3) || exit 1
+        --inputbox "Informe o IP estático com máscara CIDR:\n(Ex: 10.172.0.220/16 para máscara 255.255.0.0)" 10 65 "$SUGGESTED_IP" 3>&1 1>&2 2>&3) || exit 1
 
     STATIC_GW=$(whiptail --title "$TITLE - Gateway" \
-        --inputbox "Informe o Gateway padrão da sua rede (Ex: 10.50.2.1 ou 192.168.1.1):" 10 65 "10.50.2.1" 3>&1 1>&2 2>&3) || exit 1
+        --inputbox "Informe o Gateway padrão da sua rede:" 10 65 "$HOST_DEFAULT_GW" 3>&1 1>&2 2>&3) || exit 1
 
     STATIC_DNS=$(whiptail --title "$TITLE - Servidor DNS" \
-        --inputbox "Informe o Servidor DNS:" 10 65 "1.1.1.1" 3>&1 1>&2 2>&3) || exit 1
+        --inputbox "Informe o Servidor DNS:" 10 65 "$HOST_DEFAULT_GW" 3>&1 1>&2 2>&3) || exit 1
 
     NET_CONFIG="name=eth0,bridge=${CT_BRIDGE},ip=${STATIC_IP},gw=${STATIC_GW}"
 else
@@ -276,7 +291,8 @@ pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${DEBIAN_TEMPLATE}" \
     -rootfs "${CT_STORAGE}:${CT_DISK}" \
     -features nesting=1 \
     -onboot 1 \
-    -unprivileged 0
+    -unprivileged 0 \
+    -password "admin"
 
 if [ "$NET_CHOICE" = "2" ] && [ -n "${STATIC_DNS:-}" ]; then
     pct set "$CT_ID" -nameserver "$STATIC_DNS"
@@ -301,6 +317,15 @@ for i in {1..30}; do
     fi
     sleep 1
 done
+
+# Configura usuário e senha do sistema operacional Linux (admin:admin e root:admin)
+echo -e "Configurando credenciais do sistema Linux (usuário admin:admin e root:admin)..."
+pct exec "$CT_ID" -- bash -c "
+    echo 'root:admin' | chpasswd
+    id admin &>/dev/null || useradd -m -s /bin/bash admin 2>/dev/null || true
+    echo 'admin:admin' | chpasswd
+    usermod -aG sudo admin 2>/dev/null || true
+"
 
 # Garante estrutura de pastas e permissões no armazenamento para Upload e Download
 echo -e "Configurando permissões do armazenamento (/data/iso e /data/proxmox-iso)..."
@@ -342,8 +367,8 @@ FINAL_MSG="Instalação do ProxPXE concluída com sucesso!\n\n"
 FINAL_MSG+="  • Container ID:         $CT_ID ($CT_HOSTNAME)\n"
 FINAL_MSG+="  • Status:               ATIVO E RODANDO\n"
 FINAL_MSG+="  • Painel de Controle:   http://$CT_FINAL_IP\n"
-FINAL_MSG+="  • Usuário Padrão:       admin\n"
-FINAL_MSG+="  • Senha Padrão:         admin\n"
+FINAL_MSG+="  • Usuário (Console/Web): admin (ou root)\n"
+FINAL_MSG+="  • Senha (Console/Web):   admin\n"
 if [ "$BIND_ISO" -eq 1 ]; then
     FINAL_MSG+="  • Armazenamento ISOs:   HÍBRIDO (/data/iso Próprio + /data/proxmox-iso PVE)\n"
 else
@@ -371,10 +396,10 @@ else
     echo -e "                            ${CYAN}Upload via Web e Download por Link URL ativados!${NC}"
 fi
 echo -e "------------------------------------------------------------------------------"
-echo -e "  ${WHITE}${BOLD}🌐 ENDEREÇO DE ACESSO AO PAINEL WEB:${NC}"
-echo -e "     URL:                   ${GREEN}${BOLD}http://${CT_FINAL_IP}${NC}"
-echo -e "     Usuário Padrão:        ${BOLD}admin${NC}"
-echo -e "     Senha Padrão:          ${BOLD}admin${NC}"
+echo -e "  ${WHITE}${BOLD}🌐 ACESSO AO PAINEL WEB E CONSOLE DO CONTAINER:${NC}"
+echo -e "     URL Web:               ${GREEN}${BOLD}http://${CT_FINAL_IP}${NC}"
+echo -e "     Usuário (Web/Console): ${BOLD}admin${NC} (ou root)"
+echo -e "     Senha (Web/Console):   ${BOLD}admin${NC}"
 echo -e "------------------------------------------------------------------------------"
 echo -e "  ${YELLOW}${BOLD}📡 INICIALIZAÇÃO DE COMPUTADORES POR REDE (PXE):${NC}"
 echo -e "     Modo de Operação:      ${YELLOW}ProxyDHCP (Porta 4011)${NC} - Não altera o roteador da sua rede!"

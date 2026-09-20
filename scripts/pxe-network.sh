@@ -84,6 +84,10 @@ apply_dnsmasq_proxy() {
 
     # Se estiver em ambiente com /etc/dnsmasq.d
     if [ -d "/etc/dnsmasq.d" ]; then
+        if [ -f /etc/dnsmasq.conf ] && ! grep -q "conf-dir=/etc/dnsmasq.d" /etc/dnsmasq.conf 2>/dev/null; then
+            echo "conf-dir=/etc/dnsmasq.d/,*.conf" >> /etc/dnsmasq.conf
+        fi
+
         cat << EOF > "$CONF_FILE"
 # ====================================================
 # PROXPXE - MODO PROXYDHCP DINÂMICO
