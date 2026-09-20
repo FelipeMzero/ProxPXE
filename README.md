@@ -12,28 +12,46 @@ Abra o **Shell do seu nó Proxmox VE (PVE)** e execute o comando abaixo:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh)"
 ```
 
-O assistente interativo em tela gráfica de terminal (`whiptail`) oferece:
-1. **Navegação pelas Setas (↑ ↓) e Teclado:** Selecione opções facilmente sem precisar digitar nomes complexos de storages ou interfaces de rede!
-2. **Suporte a Cluster Proxmox:** Se estiver em um cluster PVE multi-nó, permite escolher em qual nó do cluster o ProxPXE será instalado.
-3. **Verificação de Container ID Livre:** Sugere automaticamente o próximo ID disponível no cluster e impede duplicidade de IDs.
+> **Dica:** Para forçar o download sem cache da versão mais recente, você também pode usar:
+> ```bash
+> bash -c "$(curl -fsSL "https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh?$(date +%s)")"
+> ```
+
+### 🖥️ O que o assistente interativo (`whiptail`) configura:
+
+1. **Navegação com Setas (↑ ↓) e Teclado:** Seleção fácil de opções sem necessidade de digitar caminhos manuais.
+2. **Suporte a Cluster Proxmox:** Se estiver em cluster PVE, permite escolher em qual nó o ProxPXE será provisionado.
+3. **Verificação de Container ID Livre:** Sugere o próximo ID disponível no cluster e impede conflito de IDs duplicados.
 4. **Seleção de Storage com Setas:** Lista os storages disponíveis (`local-lvm`, `hrmj-vm`, `local-zfs`, etc.) com tamanho livre em GB.
-5. **Configuração de Recursos:** Disco (GB), Memória RAM (MB) e SWAP (MB).
-6. **Seleção de Bridge de Rede com Setas:** Escolha a interface bridge (`vmbr0`, `vmbr1`, etc.).
+5. **Hardware:** Tamanho do Disco (GB), Memória RAM (MB) e SWAP (MB).
+6. **Seleção de Bridge de Rede com Setas:** Escolha a interface de rede bridge (`vmbr0`, `vmbr1`, etc.).
 7. **Modo de Endereço IP:**
-   - Opção 1: Usar a **range da rede via DHCP** automaticamente (Recomendado).
-   - Opção 2: Configurar **IP Fixo/Estático** (IP/CIDR, Gateway e Servidor DNS).
-8. **Compartilhamento de ISOs do Proxmox:** Pergunta se deseja montar `/var/lib/vz/template/iso` diretamente no container, economizando espaço em disco!
+   - **Opção 1:** Usar a **range da rede via DHCP** automaticamente (Recomendado).
+   - **Opção 2:** Configurar **IP Fixo/Estático** (IP com máscara CIDR, Gateway e Servidor DNS).
+8. **Configuração do Armazenamento de ISOs:**
+   - **Opção 1 (Recomendado):** Criar pasta própria (`/data/iso`) no storage escolhido — 100% pronta para **Upload pelo Navegador** e **Download direto por Link/URL**.
+   - **Opção 2:** Compartilhar a pasta de ISOs nativa do Proxmox (`/var/lib/vz/template/iso`) para economizar espaço em disco.
+
+---
+
+## 🔄 Como Atualizar um Container Existente (Sem Recriar)
+
+Se você já possui o container criado e quer apenas atualizar a aplicação e o painel web para a versão mais recente, execute no **Shell do Proxmox** (substitua `<ID>` pelo número do seu CT, ex: `100`):
+
+```bash
+pct exec <ID> -- bash -c "rm -rf /tmp/pxe-setup && git clone https://github.com/FelipeMzero/ProxPXE.git /tmp/pxe-setup && bash /tmp/pxe-setup/install.sh"
+```
 
 ---
 
 ## 🔐 Acesso ao Painel Web & Credenciais Padrão
 
-Acesse no navegador: **`http://<IP_DO_CONTAINER>`**
+Acesse pelo navegador: **`http://<IP_DO_CONTAINER>`**
 
 - **Usuário Padrão:** `admin`
 - **Senha Padrão:** `admin`
 
-*(Você pode alterar as credenciais diretamente pelo painel a qualquer momento).*
+*(Você pode alterar a senha diretamente pelo painel a qualquer momento).*
 
 ---
 
