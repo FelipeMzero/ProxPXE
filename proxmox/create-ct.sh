@@ -42,13 +42,44 @@ DEFAULT_HOSTNAME="proxpxe"
 read -r -p "2. Digite o nome da máquina (Hostname) [Padrão: $DEFAULT_HOSTNAME]: " CT_HOSTNAME
 CT_HOSTNAME=${CT_HOSTNAME:-$DEFAULT_HOSTNAME}
 
-# 3. Onde vai ser instalado o CT (Storage)
-echo -e "\n${BOLD}3. Onde o Container será instalado (Storage)?${NC}"
-AVAILABLE_STORAGES=$(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 {print $1}')
-DEFAULT_STORAGE=$(echo "$AVAILABLE_STORAGES" | head -n1)
-echo -e "   Storages disponíveis no seu Proxmox: ${CYAN}$AVAILABLE_STORAGES${NC}"
-read -r -p "   Informe o Storage desejado [Padrão: $DEFAULT_STORAGE]: " CT_STORAGE
-CT_STORAGE=${CT_STORAGE:-$DEFAULT_STORAGE}
+# 3. Onde vai ser instalado o CT (Storage do Disco)
+echo -e "\n${BOLD}3. Onde o Container será instalado (Escolha o Storage do Disco)?${NC}"
+
+# Detecta storages disponíveis para rootfs
+STORAGES=()
+while IFS= read -r line; do
+    [ -n "$line" ] && STORAGES+=("$line")
+done < <(pvesm status -content rootdir 2>/dev/null | awk 'NR>1 {print $1}')
+
+# Fallback se array vazio
+if [ ${#STORAGES[@]} -eq 0 ]; then
+    STORAGES=("local-lvm" "local-zfs" "local")
+fi
+
+echo -e "   Selecione o número correspondente ao storage do Proxmox:"
+for i in "${!STORAGES[@]}"; do
+    num=$((i + 1))
+    storage_name="${STORAGES[$i]}"
+    storage_info=$(pvesm status -storage "$storage_name" 2>/dev/null | awk 'NR>1 {print $2 ", Livre: " int($6/1024/1024) " GB"}' || true)
+    if [ -n "$storage_info" ]; then
+        echo -e "     ${CYAN}${num})${NC} ${BOLD}${storage_name}${NC} (${storage_info})"
+    else
+        echo -e "     ${CYAN}${num})${NC} ${BOLD}${storage_name}${NC}"
+    fi
+done
+
+read -r -p "   Digite apenas o NÚMERO da opção desejada [1-${#STORAGES[@]}, Padrão: 1]: " STORAGE_CHOICE
+STORAGE_CHOICE=${STORAGE_CHOICE:-1}
+
+# Valida o número digitado
+if [[ "$STORAGE_CHOICE" =~ ^[0-9]+$ ]] && [ "$STORAGE_CHOICE" -ge 1 ] && [ "$STORAGE_CHOICE" -le "${#STORAGES[@]}" ]; then
+    INDEX=$((STORAGE_CHOICE - 1))
+    CT_STORAGE="${STORAGES[$INDEX]}"
+else
+    echo -e "   ${YELLOW}[AVISO] Opção inválida. Usando a opção 1: ${STORAGES[0]}${NC}"
+    CT_STORAGE="${STORAGES[0]}"
+fi
+echo -e "   -> Storage selecionado: ${GREEN}${BOLD}${CT_STORAGE}${NC}"
 
 # 4. Quantidade de Armazenamento (Disco)
 echo -e "\n${BOLD}4. Quantidade de Armazenamento (Tamanho do Disco do CT):${NC}"
@@ -95,11 +126,15 @@ fi
 PVE_ISO_DIR="/var/lib/vz/template/iso"
 BIND_ISO=0
 if [ -d "$PVE_ISO_DIR" ]; then
-    echo -e "\n${YELLOW}[RECURSO ESPECIAL]${NC} A pasta de ISOs nativa do Proxmox (${PVE_ISO_DIR}) foi encontrada!"
-    read -r -p "Deseja compartilhar as ISOs já baixadas no Proxmox diretamente com o ProxPXE? [S/n]: " SHARE_ISO
-    SHARE_ISO=${SHARE_ISO:-S}
-    if [[ "$SHARE_ISO" =~ ^[Ss]$ ]]; then
+    echo -e "\n${BOLD}8. Compartilhamento de ISOs existentes do Proxmox:${NC}"
+    echo -e "   A pasta de ISOs nativa do Proxmox (${CYAN}${PVE_ISO_DIR}${NC}) foi encontrada!"
+    echo -e "     ${CYAN}1) Sim (Recomendado - Economiza espaço e usa as ISOs já baixadas no Proxmox)${NC}"
+    echo -e "     ${CYAN}2) Não (Pasta de ISOs separada e isolada)${NC}"
+    read -r -p "   Selecione a opção [1 ou 2, Padrão: 1]: " SHARE_CHOICE
+    SHARE_CHOICE=${SHARE_CHOICE:-1}
+    if [ "$SHARE_CHOICE" = "1" ] || [[ "$SHARE_CHOICE" =~ ^[Ss]$ ]]; then
         BIND_ISO=1
+        echo -e "   -> As ISOs do Proxmox serão compartilhadas com o ProxPXE!"
     fi
 fi
 
