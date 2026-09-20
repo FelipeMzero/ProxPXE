@@ -142,7 +142,7 @@ desktop-color: "$BG_COLOR"
     top = 89%
     width = 64%
     height = 24
-    text = "[Enter] Iniciar  |  [e] Editar Parâmetros  |  [c] Console  |  $ORGANIZATION"
+    text = "[▲/▼] Selecionar  |  [Enter] Iniciar  |  $ORGANIZATION"
     font = "$ACTIVE_FONT 11"
     color = "$HOTKEY_COLOR"
     align = "center"

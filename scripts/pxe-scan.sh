@@ -30,36 +30,24 @@ echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR e $PVE_ISO_DIR..
 # Inicia cabeçalho do pxelinux.cfg/default (BIOS Legacy)
 cat << 'EOF' > "$SYS_CFG"
 PATH bios/ /
-UI vesamenu.c32
-DEFAULT ventoy_grub
+UI menu.c32
+DEFAULT 1
 PROMPT 0
-TIMEOUT 150
-ONTIMEOUT ventoy_grub
+TIMEOUT 300
+ONTIMEOUT 1
 
-MENU TITLE ProxPXE - Hospital Regional Menino Jesus (Ventoy Edition)
-MENU BACKGROUND /theme/background.png
-MENU RESOLUTION 1024 768
+MENU TITLE ProxPXE - Hospital Regional Menino Jesus (Ventoy BIOS)
+MENU TABMSG Use as setas [^/v] para navegar e [ENTER] para iniciar
+MENU NOTIMEOUTMSG Pressione [ENTER] para iniciar imediatamente
 
-MENU COLOR screen       37;40   #00000000 #00000000 none
-MENU COLOR border       30;44   #00000000 #00000000 none
-MENU COLOR title        1;36;44 #ff1e40af #00000000 std
-MENU COLOR sel          7;37;40 #ffffffff #ff2563eb all
-MENU COLOR unsel        37;44   #ff334155 #00000000 std
-MENU COLOR help         37;40   #ff64748b #00000000 std
-MENU COLOR timeout      37;40   #ff64748b #00000000 std
-MENU COLOR timeout_msg  37;40   #ff64748b #00000000 std
-
-LABEL ventoy_grub
-    MENU LABEL [>>] INICIAR INTERFACE VENTOY COMPLETA (GRUB2)
-    KERNEL /grub/i386-pc/core.0
-
-LABEL -
-    MENU LABEL ----------------------------------------------------
-    MENU DISABLE
-
-LABEL -
-    MENU LABEL  *** ISOs DISPONIVEIS (SELECAO DIRETA SYSLINUX) ***
-    MENU DISABLE
+MENU COLOR title    1;36;44    #ffffffff #00000000 std
+MENU COLOR sel      7;37;40    #ffffffff #ff2563eb all
+MENU COLOR hotsel   1;7;37;40  #ffffffff #ff2563eb all
+MENU COLOR unsel    37;44      #ffcbd5e1 #00000000 std
+MENU COLOR help     37;40      #ff94a3b8 #00000000 none
+MENU COLOR border   30;44      #ff3b82f6 #00000000 none
+MENU COLOR timeout  37;40      #ff64748b #00000000 none
+MENU COLOR timeout_msg 37;40   #ff64748b #00000000 none
 
 EOF
 
@@ -350,7 +338,7 @@ EOF
     }
 
     menuentry "   << Voltar ao Menu Principal" --class cancel {
-        configfile (tftp)/grub/grub.cfg
+        configfile \$prefix/grub.cfg
     }
 }
 
@@ -361,6 +349,9 @@ EOF
 LABEL iso_$ISO_COUNT
     MENU LABEL $ISO_COUNT. $os_title ($iso_size_str) [Normal]
 EOF
+    if [ "$ISO_COUNT" -eq 1 ]; then
+        echo "    MENU DEFAULT" >> "$SYS_CFG"
+    fi
 
     if [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$SYS_CFG"
@@ -511,38 +502,57 @@ shopt -u nullglob nocaseglob
 
 echo "]" >> "$JSON_OUT"
 
-# Rodapé de utilitários no GRUB2
+# Rodapé de utilitários no GRUB2 (Opções do Sistema no final da lista)
 cat << 'EOF' >> "$GRUB_CFG"
-# Opções de Sistema e Ferramentas
-submenu ">> Ferramentas e Opcoes Avancadas" --class tool {
-    menuentry "Iniciar iPXE Shell / Sanboot" --class net {
+
+# ====================================================
+# OPÇÕES DE SISTEMA (RODAPÉ DO MENU PRINCIPAL)
+# ====================================================
+menuentry "------------------------------------------------------------" --class blank {
+    true
+}
+
+menuentry "Boot pelo Disco Local" --class local --class hdd {
+    exit
+}
+
+menuentry "Iniciar iPXE Shell / Sanboot" --class net {
+    if [ "$grub_platform" = "pc" ]; then
+        linux16 (http,$pxe_server)/bios/undionly.kpxe
+    else
         chainloader (http,$pxe_server)/uefi/ipxe.efi
-    }
-    menuentry "Reiniciar Computador" --class restart {
-        reboot
-    }
-    menuentry "Desligar Computador" --class shutdown {
-        halt
-    }
+    fi
+}
+
+menuentry "Reiniciar Computador" --class restart {
+    reboot
+}
+
+menuentry "Desligar Computador" --class shutdown {
+    halt
 }
 EOF
 
-# Rodapé do PXELINUX (BIOS Legacy)
+# Rodapé do PXELINUX (BIOS Legacy - Opções no final da lista)
 cat << 'EOF' >> "$SYS_CFG"
 LABEL -
-    MENU LABEL  ------------------------------------------------
+    MENU LABEL --------------------------------------------------------
     MENU DISABLE
 
+LABEL local
+    MENU LABEL [L] Boot pelo Disco Local
+    LOCALBOOT 0
+
 LABEL ipxe
-    MENU LABEL >> Iniciar iPXE (HTTP Boot)
-    KERNEL /bios/undionly.kpxe
+    MENU LABEL [I] Iniciar iPXE Shell / Sanboot
+    KERNEL bios/undionly.kpxe
 
 LABEL reboot
-    MENU LABEL >> Reiniciar Computador
+    MENU LABEL [R] Reiniciar Computador
     COM32 reboot.c32
 
 LABEL poweroff
-    MENU LABEL >> Desligar Computador
+    MENU LABEL [P] Desligar Computador
     COM32 poweroff.c32
 EOF
 
@@ -558,14 +568,20 @@ cp "$GRUB_CFG" "$TFTP_DIR/grub.cfg" 2>/dev/null || true
 cp "$GRUB_CFG" "$TFTP_DIR/grub/i386-pc/grub.cfg" 2>/dev/null || true
 cp "$GRUB_CFG" "$TFTP_DIR/grub/x86_64-efi/grub.cfg" 2>/dev/null || true
 
-# Rodapé do iPXE
+# Rodapé do iPXE (Opções do Sistema no final da lista)
 cat << 'EOF' >> "$IPXE_CFG"
+item --gap --             -----------------------------------------
 item --gap --             --- Opções do Sistema ---
+item localboot            Boot pelo Disco Local
 item shell                iPXE Shell
-item reboot               Reiniciar
-item exit                 Sair para BIOS
+item reboot               Reiniciar Computador
+item poweroff             Desligar Computador
+item exit                 Sair para BIOS/UEFI
 
 choose --timeout ${menu-timeout} target && goto ${target}
+
+:localboot
+sanboot --no-describe --drive 0x80 || exit
 
 :shell
 shell
@@ -573,6 +589,9 @@ goto start
 
 :reboot
 reboot
+
+:poweroff
+poweroff || exit
 
 :exit
 exit

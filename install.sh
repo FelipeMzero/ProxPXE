@@ -72,11 +72,17 @@ mkdir -p /var/lib/tftpboot/uefi /var/lib/tftpboot/bios /var/lib/tftpboot/grub/fo
 # 1. Configuração inicial embutida (Early Config)
 EARLY_CFG="/tmp/early_grub.cfg"
 cat << 'EOF' > "$EARLY_CFG"
+if [ -n "$net_default_server" ]; then
+    set root=(tftp,$net_default_server)
+    set prefix=($root)/grub
+fi
 if [ -z "$root" ] || [ "$root" = "" ]; then
     if [ -d (tftp) ]; then
         set root=(tftp)
+        set prefix=(tftp)/grub
     elif [ -d (pxe) ]; then
         set root=(pxe)
+        set prefix=(pxe)/grub
     fi
 fi
 if [ -s ($root)/grub/grub.cfg ]; then
@@ -85,9 +91,8 @@ if [ -s ($root)/grub/grub.cfg ]; then
 elif [ -s (tftp)/grub/grub.cfg ]; then
     set prefix=(tftp)/grub
     configfile (tftp)/grub/grub.cfg
-elif [ -s (pxe)/grub/grub.cfg ]; then
-    set prefix=(pxe)/grub
-    configfile (pxe)/grub/grub.cfg
+elif [ -s ($prefix)/grub.cfg ]; then
+    configfile ($prefix)/grub.cfg
 elif [ -s (tftp)/grub.cfg ]; then
     set prefix=(tftp)
     configfile (tftp)/grub.cfg
@@ -99,14 +104,14 @@ if command -v grub-mkstandalone >/dev/null 2>&1; then
     grub-mkstandalone \
         -O x86_64-efi \
         -o /var/lib/tftpboot/uefi/grubnetx64.efi \
-        --modules="tftp http efinet net all_video font gfxterm gfxmenu png cat configfile test sleep linux echo" \
+        --modules="tftp http efinet net all_video font gfxterm gfxmenu png cat configfile test sleep linux echo normal reboot halt chain true progress" \
         "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || true
 
     # Compila binário BIOS i386-pc-pxe auto-contido
     grub-mkstandalone \
         -O i386-pc-pxe \
         -o /var/lib/tftpboot/bios/grub.0 \
-        --modules="pxe tftp http all_video vbe vga font gfxterm gfxmenu png cat configfile test sleep linux linux16 echo" \
+        --modules="pxe tftp http all_video vbe vga font gfxterm gfxmenu png cat configfile test sleep linux linux16 echo normal reboot halt chain true progress" \
         "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || true
 fi
 rm -f "$EARLY_CFG"

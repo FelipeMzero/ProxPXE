@@ -51,7 +51,7 @@ desktop-color: "#f8fafc"
     top = 89%
     width = 64%
     height = 24
-    text = "[Enter] Iniciar  |  [e] Editar Parâmetros  |  [c] Console  |  Hospital Regional Menino Jesus"
+    text = "[▲/▼] Selecionar  |  [Enter] Iniciar  |  Hospital Regional Menino Jesus"
     font = "Outfit 11"
     color = "#64748b"
     align = "center"
