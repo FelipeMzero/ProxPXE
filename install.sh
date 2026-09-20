@@ -43,7 +43,8 @@ apt-get install -y \
     curl \
     wget \
     rsync \
-    net-tools
+    net-tools \
+    wimtools
 
 log_ok "Pacotes do sistema instalados com sucesso!"
 
@@ -188,6 +189,17 @@ find /usr/lib/ipxe -name "undionly.kpxe" -exec cp -f {} /var/lib/tftpboot/bios/u
 find /usr/lib/ipxe -name "undionly.kpxe" -exec cp -f {} /var/lib/tftpboot/undionly.kpxe \; 2>/dev/null || true
 find /usr/lib/syslinux -name "memdisk" -exec cp -f {} /var/lib/tftpboot/memdisk \; 2>/dev/null || true
 find /usr/lib/syslinux -name "memdisk" -exec cp -f {} /var/lib/tftpboot/bios/memdisk \; 2>/dev/null || true
+
+# Wimboot (para boot de instaladores Windows estilo Ventoy)
+if [ ! -s /var/lib/tftpboot/wimboot ]; then
+    echo "    -> Baixando binário wimboot para suporte a instaladores Windows..."
+    curl -fsSL https://github.com/ipxe/wimboot/releases/latest/download/wimboot -o /var/lib/tftpboot/wimboot 2>/dev/null || wget -q https://github.com/ipxe/wimboot/releases/latest/download/wimboot -O /var/lib/tftpboot/wimboot 2>/dev/null || true
+fi
+chmod 755 /var/lib/tftpboot/wimboot 2>/dev/null || true
+cp -f /var/lib/tftpboot/wimboot /var/lib/tftpboot/bios/wimboot 2>/dev/null || true
+cp -f /var/lib/tftpboot/wimboot /var/lib/tftpboot/uefi/wimboot 2>/dev/null || true
+mkdir -p /data/wimboot
+cp -f /var/lib/tftpboot/wimboot /data/wimboot/ 2>/dev/null || true
 
 # Permissões irrestritas no TFTP para evitar erro PXE-E23 / 0 Bytes
 chmod -R 777 /var/lib/tftpboot

@@ -228,14 +228,19 @@ for item in "${RAW_ISOS[@]}"; do
         os_type="rescue"
     fi
 
-    # Tenta extrair kernel/initrd se 7z ou xorriso estiver instalado
+    # Tenta extrair dados mínimos de boot para carregamento rápido
     vmlinuz_path=""
     initrd_path=""
 
     if command -v 7z >/dev/null 2>&1; then
         if [ ! -f "$target_extract/.extracted" ]; then
-            echo "    -> Extraindo kernel/initrd de $iso_name para boot rápido HTTP..."
-            7z x "$iso_path" -o"$target_extract" "boot*" "casper*" "live*" "isolinux*" -r -y >/dev/null 2>&1 || true
+            if [ "$os_type" = "windows" ]; then
+                echo "    -> Extraindo bootloader WinPE de $iso_name (estilo Ventoy)..."
+                7z x "$iso_path" -o"$target_extract" "bootmgr*" "boot/bcd" "boot/boot.sdi" "sources/boot.wim" -r -y >/dev/null 2>&1 || true
+            else
+                echo "    -> Extraindo kernel/initrd de $iso_name para boot rápido HTTP (estilo Ventoy)..."
+                7z x "$iso_path" -o"$target_extract" "boot*" "casper*" "live*" "isolinux*" -r -y >/dev/null 2>&1 || true
+            fi
             touch "$target_extract/.extracted"
         fi
     fi
@@ -251,60 +256,110 @@ for item in "${RAW_ISOS[@]}"; do
         rel_initrd=$(echo "$initrd_file" | sed "s|^$EXTRACTED_DIR/||")
     fi
 
-    # --- Gera Entrada no GRUB2 ---
+    if [ "$iso_size" -ge 1024 ]; then
+        iso_size_str="$(awk -v s="$iso_size" 'BEGIN {printf "%.1f GB", s/1024}')"
+    else
+        iso_size_str="${iso_size} MB"
+    fi
+
+    # --- Gera Submenu no GRUB2 com os Modos de Boot do Ventoy ---
     cat << EOF >> "$GRUB_CFG"
-menuentry "$os_title [$iso_source]" --class $os_class --class gnu-linux --class os {
+submenu "$os_title ($iso_size_str) [$iso_source]" --class $os_class --class gnu-linux --class os {
+    set default="0"
+    set timeout="10"
+
+    menuentry "-> [1] Iniciar em Modo Normal (Ventoy HTTP Live Stream)" --class play --class $os_class {
 EOF
 
     if [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
-    echo "Carregando Proxmox VE via HTTP..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel vga=791 splash=silent ip=dhcp
-    initrd (http,\$pxe_server)/extracted/$rel_initrd
+        echo "Iniciando Proxmox VE via HTTP (Modo Ventoy)..."
+        linux (http,\$pxe_server)/extracted/$rel_kernel vga=791 splash=silent ip=dhcp proxmox-iso=http://\$pxe_server/$http_dir/$rel_iso_url
+        initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
-    echo "Carregando Ubuntu Live HTTP..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel ip=dhcp url=http://\$pxe_server/$http_dir/$rel_iso_url ds=nocloud-net ---
-    initrd (http,\$pxe_server)/extracted/$rel_initrd
+        echo "Iniciando Ubuntu Live via HTTP (Modo Ventoy)..."
+        linux (http,\$pxe_server)/extracted/$rel_kernel ip=dhcp url=http://\$pxe_server/$http_dir/$rel_iso_url ds=nocloud-net ---
+        initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
-    echo "Carregando Debian Live..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live components fetch=http://\$pxe_server/$http_dir/$rel_iso_url
-    initrd (http,\$pxe_server)/extracted/$rel_initrd
+        echo "Iniciando Debian Live via HTTP (Modo Ventoy)..."
+        linux (http,\$pxe_server)/extracted/$rel_kernel boot=live components fetch=http://\$pxe_server/$http_dir/$rel_iso_url
+        initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
-    echo "Carregando Clonezilla..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://\$pxe_server/$http_dir/$rel_iso_url
-    initrd (http,\$pxe_server)/extracted/$rel_initrd
+        echo "Iniciando Clonezilla Live via HTTP (Modo Ventoy)..."
+        linux (http,\$pxe_server)/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://\$pxe_server/$http_dir/$rel_iso_url
+        initrd (http,\$pxe_server)/extracted/$rel_initrd
+EOF
+    elif [ "$os_type" = "arch" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$GRUB_CFG"
+        echo "Iniciando Arch Linux via HTTP (Modo Ventoy)..."
+        linux (http,\$pxe_server)/extracted/$rel_kernel archiso_http_srv=http://\$pxe_server/$http_dir/ ip=dhcp cms_verify=y
+        initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "windows" ]; then
         cat << EOF >> "$GRUB_CFG"
-    echo "Iniciando Instalador Windows via iPXE Sanboot..."
-    chainloader (http,\$pxe_server)/uefi/ipxe.efi
+        echo "Iniciando Instalador Microsoft Windows (Modo Ventoy)..."
+        if [ "\$grub_platform" = "pc" ]; then
+            linux16 (http,\$pxe_server)/bios/undionly.kpxe
+        else
+            chainloader (http,\$pxe_server)/uefi/ipxe.efi
+        fi
 EOF
     else
-        # Fallback genérico: Memdisk no BIOS ou iPXE no UEFI
         cat << EOF >> "$GRUB_CFG"
-    echo "Carregando $iso_name..."
-    if [ "\$grub_platform" = "pc" ]; then
-        linux16 (http,\$pxe_server)/memdisk iso raw
-        initrd16 (http,\$pxe_server)/$http_dir/$rel_iso_url
-    else
-        chainloader (http,\$pxe_server)/uefi/ipxe.efi
-    fi
+        echo "Iniciando $iso_name (Modo Ventoy)..."
+        if [ -n "${rel_kernel:-}" ] && [ -n "${rel_initrd:-}" ]; then
+            linux (http,\$pxe_server)/extracted/$rel_kernel ip=dhcp
+            initrd (http,\$pxe_server)/extracted/$rel_initrd
+        elif [ "\$grub_platform" = "pc" ]; then
+            linux16 (http,\$pxe_server)/memdisk iso raw
+            initrd16 (http,\$pxe_server)/$http_dir/$rel_iso_url
+        else
+            chainloader (http,\$pxe_server)/uefi/ipxe.efi
+        fi
 EOF
     fi
 
-    echo "}" >> "$GRUB_CFG"
-    echo "" >> "$GRUB_CFG"
+    cat << EOF >> "$GRUB_CFG"
+    }
+
+    menuentry "   [2] Iniciar via iPXE Sanboot (Emulação CD-ROM Virtual em Rede)" --class net {
+        echo "Iniciando emulação de CD-ROM Virtual via iPXE Sanboot..."
+        if [ "\$grub_platform" = "pc" ]; then
+            linux16 (http,\$pxe_server)/bios/undionly.kpxe
+        else
+            chainloader (http,\$pxe_server)/uefi/ipxe.efi
+        fi
+    }
+
+    menuentry "   [3] Iniciar em Modo Memdisk (Carregar ISO inteira na RAM)" --class ram {
+        echo "Carregando $iso_name na memória RAM (Modo Memdisk estilo Ventoy)..."
+        if [ "\$grub_platform" = "pc" ]; then
+            linux16 (http,\$pxe_server)/memdisk iso raw
+            initrd16 (http,\$pxe_server)/$http_dir/$rel_iso_url
+        else
+            echo "Memdisk requer BIOS Legacy. Inicializando via emulação iPXE em UEFI..."
+            sleep 2
+            chainloader (http,\$pxe_server)/uefi/ipxe.efi
+        fi
+    }
+
+    menuentry "   << Voltar ao Menu Principal" --class cancel {
+        configfile (tftp)/grub/grub.cfg
+    }
+}
+
+EOF
 
     # --- Entrada no PXELINUX (BIOS Legacy) ---
     cat << EOF >> "$SYS_CFG"
 LABEL iso_$ISO_COUNT
-    MENU LABEL $ISO_COUNT. $os_title [$iso_source]
+    MENU LABEL $ISO_COUNT. $os_title ($iso_size_str) [Normal]
 EOF
 
     if [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
@@ -323,13 +378,23 @@ EOF
         cat << EOF >> "$SYS_CFG"
     KERNEL http://$SERVER_IP/extracted/$rel_kernel
     INITRD http://$SERVER_IP/extracted/$rel_initrd
-    APPEND vga=791 splash=silent ip=dhcp
+    APPEND vga=791 splash=silent ip=dhcp proxmox-iso=http://$SERVER_IP/$http_dir/$rel_iso_url
 EOF
     elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$SYS_CFG"
     KERNEL http://$SERVER_IP/extracted/$rel_kernel
     INITRD http://$SERVER_IP/extracted/$rel_initrd
     APPEND boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$rel_iso_url
+EOF
+    elif [ "$os_type" = "arch" ] && [ -n "${rel_kernel:-}" ]; then
+        cat << EOF >> "$SYS_CFG"
+    KERNEL http://$SERVER_IP/extracted/$rel_kernel
+    INITRD http://$SERVER_IP/extracted/$rel_initrd
+    APPEND archiso_http_srv=http://$SERVER_IP/$http_dir/ ip=dhcp cms_verify=y
+EOF
+    elif [ "$os_type" = "windows" ]; then
+        cat << EOF >> "$SYS_CFG"
+    KERNEL /bios/undionly.kpxe
 EOF
     else
         cat << EOF >> "$SYS_CFG"
@@ -338,50 +403,90 @@ EOF
     APPEND iso raw
 EOF
     fi
-    echo "" >> "$SYS_CFG"
 
-    # --- Gera Entrada no iPXE ---
-    echo "item iso_$ISO_COUNT $os_title [$iso_source]" >> "$IPXE_CFG"
+    cat << EOF >> "$SYS_CFG"
+LABEL iso_${ISO_COUNT}_mem
+    MENU LABEL    -> [Memdisk RAM] $iso_name
+    KERNEL memdisk
+    INITRD http://$SERVER_IP/$http_dir/$rel_iso_url
+    APPEND iso raw
+
+EOF
+
+    # --- Gera Entrada no iPXE com Opções de Boot estilo Ventoy ---
+    echo "item iso_$ISO_COUNT $os_title ($iso_size_str) [$iso_source]" >> "$IPXE_CFG"
 
     cat << EOF >> "$IPXE_TARGETS"
 :iso_$ISO_COUNT
+menu Modos de Inicializacao Ventoy - $os_title ($iso_size_str)
+item --gap --                --- Escolha o Modo de Boot (Estilo Ventoy) ---
+item iso_${ISO_COUNT}_norm   [1] Iniciar em Modo Normal (HTTP Live Stream)
+item iso_${ISO_COUNT}_san    [2] Iniciar via iPXE Sanboot (Virtual CD-ROM)
+item iso_${ISO_COUNT}_mem    [3] Iniciar em Modo Memdisk (Carregar ISO na RAM)
+item --gap --
+item start                   << Voltar ao Menu Principal
+choose --default iso_${ISO_COUNT}_norm --timeout 15000 target && goto \${target}
+
+:iso_${ISO_COUNT}_san
+echo [Ventoy] Conectando $iso_name como CD-ROM Virtual via HTTP Sanboot...
+sanboot --no-describe http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
+
+:iso_${ISO_COUNT}_mem
+echo [Ventoy] Carregando $iso_name na memoria RAM (Memdisk)...
+kernel http://$SERVER_IP/memdisk iso raw || goto failed
+initrd http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
+boot
+
+:iso_${ISO_COUNT}_norm
 EOF
+
     if [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
-echo Carregando Ubuntu Kernel e Initrd via HTTP...
+echo [Ventoy] Carregando Ubuntu Kernel e Initrd via HTTP...
 kernel http://$SERVER_IP/extracted/$rel_kernel ip=dhcp url=http://$SERVER_IP/$http_dir/$rel_iso_url ds=nocloud-net --- || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
     elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
-echo Carregando Debian Live via HTTP...
+echo [Ventoy] Carregando Debian Live via HTTP...
 kernel http://$SERVER_IP/extracted/$rel_kernel boot=live components fetch=http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
     elif [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
-echo Carregando Proxmox VE Installer via HTTP...
-kernel http://$SERVER_IP/extracted/$rel_kernel vga=791 splash=silent ip=dhcp || goto failed
+echo [Ventoy] Carregando Proxmox VE Installer via HTTP...
+kernel http://$SERVER_IP/extracted/$rel_kernel vga=791 splash=silent ip=dhcp proxmox-iso=http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
     elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
-echo Carregando Clonezilla Live via HTTP...
+echo [Ventoy] Carregando Clonezilla Live via HTTP...
 kernel http://$SERVER_IP/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
-    else
+    elif [ "$os_type" = "arch" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
-echo Carregando $iso_name via Memdisk (RAM)...
-kernel http://$SERVER_IP/memdisk iso raw || goto failed
-initrd http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
+echo [Ventoy] Carregando Arch Linux via HTTP...
+kernel http://$SERVER_IP/extracted/$rel_kernel archiso_http_srv=http://$SERVER_IP/$http_dir/ ip=dhcp cms_verify=y || goto failed
+initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
+    elif [ "$os_type" = "windows" ]; then
+        cat << EOF >> "$IPXE_TARGETS"
+echo [Ventoy] Inicializando Instalador Microsoft Windows via Sanboot HTTP...
+sanboot --no-describe --drive 0x80 http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
+EOF
+    else
+        cat << EOF >> "$IPXE_TARGETS"
+echo [Ventoy] Inicializando $iso_name via Sanboot HTTP...
+sanboot --no-describe http://$SERVER_IP/$http_dir/$rel_iso_url || goto iso_${ISO_COUNT}_mem
+EOF
     fi
+
     echo "" >> "$IPXE_TARGETS"
 
     # --- Adiciona no JSON para o Painel Web ---
