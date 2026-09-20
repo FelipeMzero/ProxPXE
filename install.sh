@@ -64,29 +64,75 @@ chmod -R 777 /data/iso /data/config /data/extracted 2>/dev/null || true
 chmod -R 755 /var/lib/tftpboot
 
 log_step "3/6: Compilando ambiente de Boot GRUB2 Netboot (UEFI & BIOS) e iPXE..."
-grub-mknetdir --net-directory=/var/lib/tftpboot --subdir=/grub
+mkdir -p /var/lib/tftpboot/uefi /var/lib/tftpboot/bios /var/lib/tftpboot/grub/fonts /var/lib/tftpboot/theme
 
-if [ -f /var/lib/tftpboot/grub/x86_64-efi/core.efi ]; then
-    cp /var/lib/tftpboot/grub/x86_64-efi/core.efi /var/lib/tftpboot/uefi/grubnetx64.efi
-elif [ -f /usr/lib/grub/x86_64-efi-signed/grubnetx64.efi.signed ]; then
-    cp /usr/lib/grub/x86_64-efi-signed/grubnetx64.efi.signed /var/lib/tftpboot/uefi/grubnetx64.efi
+# 1. Compila binário UEFI x86_64 auto-contido usando grub-mkstandalone
+EARLY_CFG="/tmp/early_grub.cfg"
+cat << 'EOF' > "$EARLY_CFG"
+set prefix=(tftp)/grub
+set root=(tftp)
+if [ -s (tftp)/grub/grub.cfg ]; then
+    configfile (tftp)/grub/grub.cfg
+elif [ -s (tftp)/grub.cfg ]; then
+    configfile (tftp)/grub.cfg
 fi
+EOF
+
+if command -v grub-mkstandalone >/dev/null 2>&1; then
+    grub-mkstandalone \
+        -O x86_64-efi \
+        -o /var/lib/tftpboot/uefi/grubnetx64.efi \
+        --modules="tftp http efinet net all_video font gfxterm gfxmenu png cat configfile test sleep linux echo" \
+        "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || true
+fi
+rm -f "$EARLY_CFG"
+
+# 2. Executa também grub-mknetdir como garantia de estrutura completa
+grub-mknetdir --net-directory=/var/lib/tftpboot --subdir=/grub 2>/dev/null || true
+
+# 3. Fallbacks caso o binário não tenha sido gerado ou esteja zerado
+if [ ! -s /var/lib/tftpboot/uefi/grubnetx64.efi ]; then
+    if [ -s /var/lib/tftpboot/grub/x86_64-efi/core.efi ]; then
+        cp /var/lib/tftpboot/grub/x86_64-efi/core.efi /var/lib/tftpboot/uefi/grubnetx64.efi
+    elif [ -f /usr/lib/grub/x86_64-efi-signed/grubnetx64.efi.signed ]; then
+        cp /usr/lib/grub/x86_64-efi-signed/grubnetx64.efi.signed /var/lib/tftpboot/uefi/grubnetx64.efi
+    fi
+fi
+
+# Fallback iPXE se necessário
+find /usr/lib/ipxe -name "ipxe.efi" -exec cp {} /var/lib/tftpboot/uefi/ipxe.efi \; 2>/dev/null || true
+if [ ! -s /var/lib/tftpboot/uefi/grubnetx64.efi ] && [ -s /var/lib/tftpboot/uefi/ipxe.efi ]; then
+    cp /var/lib/tftpboot/uefi/ipxe.efi /var/lib/tftpboot/uefi/grubnetx64.efi
+fi
+
+# Espelha o binário nos caminhos comuns solicitados por clientes UEFI
+cp /var/lib/tftpboot/uefi/grubnetx64.efi /var/lib/tftpboot/grubnetx64.efi 2>/dev/null || true
+cp /var/lib/tftpboot/uefi/grubnetx64.efi /var/lib/tftpboot/bootx64.efi 2>/dev/null || true
+mkdir -p /var/lib/tftpboot/grub/x86_64-efi
+cp /var/lib/tftpboot/uefi/grubnetx64.efi /var/lib/tftpboot/grub/x86_64-efi/core.efi 2>/dev/null || true
 
 # Syslinux / BIOS Legacy
 if [ -f /usr/lib/PXELINUX/lpxelinux.0 ]; then
     cp /usr/lib/PXELINUX/lpxelinux.0 /var/lib/tftpboot/bios/lpxelinux.0
+    cp /usr/lib/PXELINUX/lpxelinux.0 /var/lib/tftpboot/lpxelinux.0 2>/dev/null || true
 elif [ -f /usr/lib/PXELINUX/pxelinux.0 ]; then
     cp /usr/lib/PXELINUX/pxelinux.0 /var/lib/tftpboot/bios/lpxelinux.0
+    cp /usr/lib/PXELINUX/pxelinux.0 /var/lib/tftpboot/lpxelinux.0 2>/dev/null || true
 fi
 
 for mod in ldlinux.c32 menu.c32 vesamenu.c32 libcom32.c32 libutil.c32 chain.c32; do
     find /usr/lib/syslinux -name "$mod" -exec cp {} /var/lib/tftpboot/bios/ \; 2>/dev/null || true
+    find /usr/lib/syslinux -name "$mod" -exec cp {} /var/lib/tftpboot/ \; 2>/dev/null || true
 done
 
 # iPXE & Memdisk
-find /usr/lib/ipxe -name "ipxe.efi" -exec cp {} /var/lib/tftpboot/uefi/ipxe.efi \; 2>/dev/null || true
 find /usr/lib/ipxe -name "undionly.kpxe" -exec cp {} /var/lib/tftpboot/bios/undionly.kpxe \; 2>/dev/null || true
+find /usr/lib/ipxe -name "undionly.kpxe" -exec cp {} /var/lib/tftpboot/undionly.kpxe \; 2>/dev/null || true
 find /usr/lib/syslinux -name "memdisk" -exec cp {} /var/lib/tftpboot/memdisk \; 2>/dev/null || true
+
+# Permissões irrestritas no TFTP para evitar erro PXE-E23 / 0 Bytes
+chmod -R 777 /var/lib/tftpboot
+chown -R dnsmasq:dnsmasq /var/lib/tftpboot 2>/dev/null || chown -R nobody:nogroup /var/lib/tftpboot 2>/dev/null || true
 
 log_ok "Binários de boot compilados com sucesso!"
 

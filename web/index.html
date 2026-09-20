@@ -471,7 +471,12 @@
                 tbody.innerHTML = isos.map(i => `
                     <tr class="hover:bg-slate-50 transition">
                         <td class="p-3 font-bold uppercase text-medical-600">${i.icon || 'ISO'}</td>
-                        <td class="p-3 font-semibold text-slate-900">${i.title}</td>
+                        <td class="p-3 font-semibold text-slate-900 flex items-center gap-2">
+                            ${i.title}
+                            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${i.source === 'Proxmox' ? 'bg-orange-100 text-orange-700 border border-orange-200' : 'bg-medical-100 text-medical-800 border border-medical-200'}">
+                                ${i.source || 'Local'}
+                            </span>
+                        </td>
                         <td class="p-3 font-mono text-slate-500">${i.filename}</td>
                         <td class="p-3 font-medium">${i.size_mb} MB</td>
                         <td class="p-3 text-right">

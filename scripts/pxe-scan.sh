@@ -7,6 +7,7 @@
 set -eo pipefail
 
 ISO_DIR="${ISO_DIR:-/data/iso}"
+PVE_ISO_DIR="${PVE_ISO_DIR:-/data/proxmox-iso}"
 EXTRACTED_DIR="${EXTRACTED_DIR:-/data/extracted}"
 THEME_DIR="${THEME_DIR:-/data/theme}"
 TFTP_DIR="${TFTP_DIR:-/var/lib/tftpboot}"
@@ -16,13 +17,13 @@ GRUB_CFG="$TFTP_DIR/grub/grub.cfg"
 IPXE_CFG="$TFTP_DIR/menu.ipxe"
 JSON_OUT="$CONFIG_DIR/isos.json"
 
-mkdir -p "$ISO_DIR" "$EXTRACTED_DIR" "$THEME_DIR" "$CONFIG_DIR" "$TFTP_DIR/grub"
+mkdir -p "$ISO_DIR" "$PVE_ISO_DIR" "$EXTRACTED_DIR" "$THEME_DIR" "$CONFIG_DIR" "$TFTP_DIR/grub" "$TFTP_DIR/uefi" "$TFTP_DIR/bios"
 
 # Detecta IP do servidor
 SERVER_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "192.168.1.100")
 SERVER_IP=${SERVER_IP:-"192.168.1.100"}
 
-echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR..."
+echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR e $PVE_ISO_DIR..."
 
 # Inicia cabeçalho do grub.cfg
 cat << 'EOF' > "$GRUB_CFG"
@@ -98,16 +99,27 @@ echo "[" > "$JSON_OUT"
 FIRST_JSON=1
 ISO_COUNT=0
 
-# Loop em todas as ISOs
+# Coleta ISOs tanto da pasta local quanto do Proxmox compartilhado
 shopt -s nullglob nocaseglob
-for iso_path in "$ISO_DIR"/*.iso "$ISO_DIR"/*.img; do
+RAW_ISOS=()
+for f in "$ISO_DIR"/*.iso "$ISO_DIR"/*.img; do
+    [ -f "$f" ] && RAW_ISOS+=("$f|Local|iso")
+done
+if [ -d "$PVE_ISO_DIR" ]; then
+    for f in "$PVE_ISO_DIR"/*.iso "$PVE_ISO_DIR"/*.img; do
+        [ -f "$f" ] && RAW_ISOS+=("$f|Proxmox|proxmox-iso")
+    done
+fi
+
+for item in "${RAW_ISOS[@]}"; do
+    IFS='|' read -r iso_path iso_source http_dir <<< "$item"
     [ -f "$iso_path" ] || continue
     
     ISO_COUNT=$((ISO_COUNT + 1))
     iso_name=$(basename "$iso_path")
     iso_lower=$(echo "$iso_name" | tr '[:upper:]' '[:lower:]')
     iso_slug=$(echo "$iso_name" | sed 's/[^a-zA-Z0-9_\-]/_/g')
-    iso_size=$(du -m "$iso_path" | cut -f1)
+    iso_size=$(du -m "$iso_path" | cut -f1 2>/dev/null || echo "0")
     
     target_extract="$EXTRACTED_DIR/$iso_slug"
     mkdir -p "$target_extract"
@@ -163,6 +175,8 @@ for iso_path in "$ISO_DIR"/*.iso "$ISO_DIR"/*.img; do
     vmlinuz_file=$(find "$target_extract" -type f \( -name "vmlinuz*" -o -name "linux*" \) 2>/dev/null | head -n1 || true)
     initrd_file=$(find "$target_extract" -type f \( -name "initrd*" -o -name "initramfs*" \) 2>/dev/null | head -n1 || true)
 
+    rel_kernel=""
+    rel_initrd=""
     if [ -n "$vmlinuz_file" ] && [ -n "$initrd_file" ]; then
         rel_kernel=$(echo "$vmlinuz_file" | sed "s|^$EXTRACTED_DIR/||")
         rel_initrd=$(echo "$initrd_file" | sed "s|^$EXTRACTED_DIR/||")
@@ -170,7 +184,7 @@ for iso_path in "$ISO_DIR"/*.iso "$ISO_DIR"/*.img; do
 
     # --- Gera Entrada no GRUB2 ---
     cat << EOF >> "$GRUB_CFG"
-menuentry "$os_title" --class $os_class --class gnu-linux --class os {
+menuentry "$os_title [$iso_source]" --class $os_class --class gnu-linux --class os {
 EOF
 
     if [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
@@ -182,19 +196,19 @@ EOF
     elif [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando Ubuntu Live HTTP..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel ip=dhcp url=http://\$pxe_server/iso/$iso_name ds=nocloud-net ---
+    linux (http,\$pxe_server)/extracted/$rel_kernel ip=dhcp url=http://\$pxe_server/$http_dir/$iso_name ds=nocloud-net ---
     initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando Debian Live..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live components fetch=http://\$pxe_server/iso/$iso_name
+    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live components fetch=http://\$pxe_server/$http_dir/$iso_name
     initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando Clonezilla..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://\$pxe_server/iso/$iso_name
+    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://\$pxe_server/$http_dir/$iso_name
     initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "windows" ]; then
@@ -207,7 +221,7 @@ EOF
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando $iso_name em RAM (Memdisk)..."
     linux16 (http,\$pxe_server)/memdisk iso raw
-    initrd16 (http,\$pxe_server)/iso/$iso_name
+    initrd16 (http,\$pxe_server)/$http_dir/$iso_name
 EOF
     fi
 
@@ -215,7 +229,7 @@ EOF
     echo "" >> "$GRUB_CFG"
 
     # --- Gera Entrada no iPXE ---
-    echo "item iso_$ISO_COUNT $os_title" >> "$IPXE_CFG"
+    echo "item iso_$ISO_COUNT $os_title [$iso_source]" >> "$IPXE_CFG"
 
     # --- Adiciona no JSON para o Painel Web ---
     if [ "$FIRST_JSON" -eq 0 ]; then
@@ -228,7 +242,9 @@ EOF
     "title": "$os_title",
     "size_mb": $iso_size,
     "os_type": "$os_type",
-    "icon": "$os_class"
+    "icon": "$os_class",
+    "source": "$iso_source",
+    "http_url": "/$http_dir/$iso_name"
   }
 EOF
 
@@ -253,6 +269,10 @@ submenu ">> Ferramentas e Opcoes Avancadas" --class tool {
 }
 EOF
 
+# Espelha o grub.cfg para caminhos procurados por clientes UEFI e TFTP
+cp "$GRUB_CFG" "$TFTP_DIR/uefi/grub.cfg" 2>/dev/null || true
+cp "$GRUB_CFG" "$TFTP_DIR/grub.cfg" 2>/dev/null || true
+
 # Rodapé do iPXE
 cat << 'EOF' >> "$IPXE_CFG"
 item --gap --             --- Opções do Sistema ---
@@ -272,5 +292,9 @@ reboot
 :exit
 exit
 EOF
+
+# Permissões do TFTP
+chmod -R 777 "$TFTP_DIR" 2>/dev/null || true
+chown -R dnsmasq:dnsmasq "$TFTP_DIR" 2>/dev/null || chown -R nobody:nogroup "$TFTP_DIR" 2>/dev/null || true
 
 echo "==> [PXE-SCAN] Concluído! $ISO_COUNT ISOs registradas em $GRUB_CFG e $IPXE_CFG"

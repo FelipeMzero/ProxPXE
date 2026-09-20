@@ -7,12 +7,13 @@
 set -eo pipefail
 
 ISO_DIR="${ISO_DIR:-/data/iso}"
+PVE_ISO_DIR="${PVE_ISO_DIR:-/data/proxmox-iso}"
 THEME_DIR="${THEME_DIR:-/data/theme}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-mkdir -p "$ISO_DIR" "$THEME_DIR"
+mkdir -p "$ISO_DIR" "$PVE_ISO_DIR" "$THEME_DIR"
 
-echo "==> [PXE-WATCH] Iniciando monitor de eventos em $ISO_DIR e $THEME_DIR..."
+echo "==> [PXE-WATCH] Iniciando monitor de eventos em $ISO_DIR, $PVE_ISO_DIR e $THEME_DIR..."
 
 # Executa detecção de rede, tema e escaneamento iniciais
 bash "$SCRIPT_DIR/pxe-network.sh" apply || true
@@ -23,7 +24,7 @@ bash "$SCRIPT_DIR/pxe-scan.sh" || true
 if command -v inotifywait >/dev/null 2>&1; then
     echo "    -> Usando monitoramento nativo por inotifywait."
     while true; do
-        inotifywait -r -e create,delete,modify,moved_to "$ISO_DIR" "$THEME_DIR" 2>/dev/null || true
+        inotifywait -r -e create,delete,modify,moved_to "$ISO_DIR" "$PVE_ISO_DIR" "$THEME_DIR" 2>/dev/null || true
         echo "==> [PXE-WATCH] Alteração detectada! Atualizando menus..."
         sleep 2
         bash "$SCRIPT_DIR/pxe-theme.sh" || true
@@ -34,7 +35,7 @@ else
     echo "    -> inotifywait não encontrado, utilizando verificação periódica (10s)."
     LAST_STATE=""
     while true; do
-        CURRENT_STATE=$(ls -la "$ISO_DIR" "$THEME_DIR" 2>/dev/null | md5sum | awk '{print $1}')
+        CURRENT_STATE=$(ls -la "$ISO_DIR" "$PVE_ISO_DIR" "$THEME_DIR" 2>/dev/null | md5sum | awk '{print $1}')
         if [ "$CURRENT_STATE" != "$LAST_STATE" ]; then
             if [ -n "$LAST_STATE" ]; then
                 echo "==> [PXE-WATCH] Mudança detectada! Atualizando menus..."

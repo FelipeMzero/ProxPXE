@@ -93,7 +93,6 @@ apply_dnsmasq_proxy() {
 port=0
 enable-tftp
 tftp-root=/var/lib/tftpboot
-tftp-secure
 tftp-max=100
 log-dhcp
 log-facility=/var/log/dnsmasq.log
@@ -109,14 +108,17 @@ dhcp-match=set:efi-x64,option:client-arch,9
 dhcp-match=set:efi-arm64,option:client-arch,11
 
 # Arquivos de Boot com o IP atual do servidor
-dhcp-boot=tag:bios,bios/lpxelinux.0,$HOST_IP
-dhcp-boot=tag:efi-ia32,uefi/grubnetia32.efi,$HOST_IP
-dhcp-boot=tag:efi-x64,uefi/grubnetx64.efi,$HOST_IP
+dhcp-boot=tag:bios,bios/lpxelinux.0,$HOST_IP,$HOST_IP
+dhcp-boot=tag:efi-ia32,uefi/grubnetia32.efi,$HOST_IP,$HOST_IP
+dhcp-boot=tag:efi-x64,uefi/grubnetx64.efi,$HOST_IP,$HOST_IP
+dhcp-boot=uefi/grubnetx64.efi,$HOST_IP,$HOST_IP
 
-# Menu PXE
+# Menu PXE / ProxyDHCP (Porta 4011)
 pxe-prompt="Inicializando ProxPXE (Ventoy Edition)...", 2
 pxe-service=tag:bios,x86PC,"ProxPXE (BIOS Legacy)",bios/lpxelinux.0
 pxe-service=tag:efi-x64,X86-64_EFI,"ProxPXE (UEFI 64-bit)",uefi/grubnetx64.efi
+pxe-service=tag:efi-x64,9,"ProxPXE (UEFI 64-bit)",uefi/grubnetx64.efi
+pxe-service=X86-64_EFI,"ProxPXE (UEFI 64-bit)",uefi/grubnetx64.efi
 EOF
 
         if command -v systemctl >/dev/null 2>&1; then
