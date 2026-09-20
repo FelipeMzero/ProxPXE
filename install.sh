@@ -4,7 +4,7 @@
 # Executado dentro do Container LXC (Debian 12) no Proxmox VE
 # ==============================================================================
 
-set -euo pipefail
+set -eo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

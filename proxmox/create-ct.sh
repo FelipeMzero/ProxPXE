@@ -6,7 +6,7 @@
 # bash -c "$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh)"
 # ==============================================================================
 
-set -euo pipefail
+set -eo pipefail
 
 # Cores do terminal
 RED='\033[0;31m'
@@ -63,7 +63,7 @@ if pvecm status >/dev/null 2>&1; then
         if [ "$TARGET_NODE" != "$CURRENT_NODE" ]; then
             clear
             echo -e "${CYAN}Conectando ao nó ${BOLD}$TARGET_NODE${NC}${CYAN} do cluster para executar a instalação...${NC}"
-            ssh -t "root@$TARGET_NODE" "bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh)\""
+            ssh -t "root@$TARGET_NODE" "bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh?\\$(date +%s))\""
             exit 0
         fi
     fi
