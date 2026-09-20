@@ -12,16 +12,17 @@ Abra o **Shell do seu nó Proxmox VE (PVE)** e execute o comando abaixo:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/create-ct.sh)"
 ```
 
-O assistente interativo perguntará detalhadamente:
-1. **Container ID e Hostname:** Sugere o próximo ID livre (ex: `110`) e nome `proxpxe`.
-2. **Onde vai ser instalado o CT (Storage):** Lista todos os storages disponíveis no Proxmox (`local-lvm`, `local-zfs`, etc.).
-3. **Armazenamento:** Quantidade de disco em GB (padrão: `32 GB`).
-4. **Memória RAM:** Quantidade de memória RAM em MB (padrão: `2048 MB`).
-5. **Memória SWAP:** Quantidade de memória SWAP em MB (padrão: `512 MB`).
-6. **Rede e Endereço IP:**
-   - Opção 1: Usar a **range da sua rede local para pegar o IP via DHCP automaticamente** (Recomendado).
-   - Opção 2: Definir um **IP específico / fixo** manualmente (IP/CIDR, Gateway e Servidor DNS).
-7. **Compartilhamento de ISOs do Proxmox:** Pergunta se deseja montar `/var/lib/vz/template/iso` diretamente no container, economizando espaço em disco!
+O assistente interativo em tela gráfica de terminal (`whiptail`) oferece:
+1. **Navegação pelas Setas (↑ ↓) e Teclado:** Selecione opções facilmente sem precisar digitar nomes complexos de storages ou interfaces de rede!
+2. **Suporte a Cluster Proxmox:** Se estiver em um cluster PVE multi-nó, permite escolher em qual nó do cluster o ProxPXE será instalado.
+3. **Verificação de Container ID Livre:** Sugere automaticamente o próximo ID disponível no cluster e impede duplicidade de IDs.
+4. **Seleção de Storage com Setas:** Lista os storages disponíveis (`local-lvm`, `hrmj-vm`, `local-zfs`, etc.) com tamanho livre em GB.
+5. **Configuração de Recursos:** Disco (GB), Memória RAM (MB) e SWAP (MB).
+6. **Seleção de Bridge de Rede com Setas:** Escolha a interface bridge (`vmbr0`, `vmbr1`, etc.).
+7. **Modo de Endereço IP:**
+   - Opção 1: Usar a **range da rede via DHCP** automaticamente (Recomendado).
+   - Opção 2: Configurar **IP Fixo/Estático** (IP/CIDR, Gateway e Servidor DNS).
+8. **Compartilhamento de ISOs do Proxmox:** Pergunta se deseja montar `/var/lib/vz/template/iso` diretamente no container, economizando espaço em disco!
 
 ---
 
