@@ -29,12 +29,12 @@ echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR e $PVE_ISO_DIR..
 
 # Inicia cabeçalho do pxelinux.cfg/default (BIOS Legacy)
 cat << 'EOF' > "$SYS_CFG"
-PATH bios/ /
+PATH bios/
 UI menu.c32
-DEFAULT 1
+DEFAULT iso_1
 PROMPT 0
 TIMEOUT 300
-ONTIMEOUT 1
+ONTIMEOUT iso_1
 
 MENU TITLE ProxPXE - Hospital Regional Menino Jesus (Ventoy BIOS)
 MENU TABMSG Use as setas [^/v] para navegar e [ENTER] para iniciar
@@ -54,18 +54,19 @@ EOF
 # Inicia cabeçalho do grub.cfg
 cat << 'EOF' > "$GRUB_CFG"
 # ====================================================
-# PROXPXE - MENU GRÁFICO ESTILO VENTOY (GRUB2)
+# PROXPXE - MENU GRÁFICO ESTILO iVENTOY/VENTOY (GRUB2)
 # Gerado automaticamente pelo script pxe-scan.sh
 # ====================================================
 
 set default="0"
-set timeout="15"
+set timeout="20"
+set timeout_style="countdown"
 
 # Carrega módulos essenciais de rede e gráficos (UEFI e BIOS)
-insmod pxe
 insmod efinet
 insmod tftp
 insmod http
+insmod net
 insmod all_video
 insmod vbe
 insmod vga
@@ -76,8 +77,13 @@ insmod gfxterm
 insmod gfxmenu
 insmod png
 insmod test
+insmod loopback
+insmod iso9660
+insmod part_msdos
+insmod part_gpt
+insmod normal
 
-# Auto-detecta IP do Servidor PXE
+# Auto-detecta IP do Servidor PXE via DHCP
 if [ -n "$net_default_server" ]; then
     set pxe_server=$net_default_server
 else
@@ -88,36 +94,24 @@ echo "    set pxe_server=$SERVER_IP" >> "$GRUB_CFG"
 cat << 'EOF' >> "$GRUB_CFG"
 fi
 
-# Carrega Fontes (Prioriza TFTP local com fallback em HTTP)
-loadfont (tftp)/theme/fonts/Outfit.pf2
-loadfont (tftp)/theme/fonts/Outfit-11.pf2
-loadfont (tftp)/grub/fonts/Outfit.pf2
-loadfont (tftp)/theme/fonts/unicode.pf2
-loadfont (tftp)/grub/fonts/unicode.pf2
-loadfont ($root)/theme/fonts/Outfit.pf2
-loadfont ($root)/theme/fonts/unicode.pf2
-loadfont (http,$pxe_server)/theme/fonts/Outfit.pf2
-loadfont (http,$pxe_server)/theme/fonts/unicode.pf2
+# Carrega Fontes (fallback progressivo TFTP → HTTP)
+if loadfont (tftp)/theme/fonts/unicode.pf2; then true; fi
+if loadfont (tftp)/theme/fonts/Outfit.pf2; then true; fi
+if loadfont (tftp)/theme/fonts/Outfit-11.pf2; then true; fi
+if loadfont (tftp)/grub/fonts/unicode.pf2; then true; fi
+if loadfont ($root)/theme/fonts/unicode.pf2; then true; fi
 
 # Resolução de tela e terminal gráfico gfxterm
 set gfxmode=1920x1080,1366x768,1024x768,800x600,auto
 set gfxpayload=keep
 terminal_output gfxterm
 
-# Carrega e ativa Tema Gráfico do Ventoy
-if [ -f (tftp)/theme/theme.txt ]; then
-    set theme=(tftp)/theme/theme.txt
-elif [ -f ($root)/theme/theme.txt ]; then
-    set theme=($root)/theme/theme.txt
-elif [ -f (http,$pxe_server)/theme/theme.txt ]; then
-    set theme=(http,$pxe_server)/theme/theme.txt
-else
-    set theme=(tftp)/theme/theme.txt
-fi
+# Ativa Tema Gráfico estilo Ventoy
+set theme=(tftp)/theme/theme.txt
 export theme
 
 # ====================================================
-# LISTA DE IMAGENS ISO DETECTADAS
+# LISTA DE IMAGENS ISO DETECTADAS (gerado dinamicamente)
 # ====================================================
 
 EOF
@@ -214,6 +208,26 @@ for item in "${RAW_ISOS[@]}"; do
         os_title="Rescue / Repair Tool ($iso_name)"
         os_class="rescue"
         os_type="rescue"
+    elif [[ "$iso_lower" =~ fedora ]]; then
+        os_title="Fedora Linux ($iso_name)"
+        os_class="fedora"
+        os_type="fedora"
+    elif [[ "$iso_lower" =~ rocky|almalinux|centos ]]; then
+        os_title="RHEL-based Linux ($iso_name)"
+        os_class="linux"
+        os_type="rhel"
+    elif [[ "$iso_lower" =~ alpine ]]; then
+        os_title="Alpine Linux ($iso_name)"
+        os_class="linux"
+        os_type="alpine"
+    elif [[ "$iso_lower" =~ kali ]]; then
+        os_title="Kali Linux ($iso_name)"
+        os_class="linux"
+        os_type="kali"
+    elif [[ "$iso_lower" =~ mint ]]; then
+        os_title="Linux Mint ($iso_name)"
+        os_class="linux"
+        os_type="mint"
     fi
 
     # Tenta extrair dados mínimos de boot para carregamento rápido
@@ -262,7 +276,7 @@ EOF
     if [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
         echo "Iniciando Proxmox VE via HTTP (Modo Ventoy)..."
-        linux (http,\$pxe_server)/extracted/$rel_kernel vga=791 splash=silent ip=dhcp proxmox-iso=http://\$pxe_server/$http_dir/$rel_iso_url
+        linux (http,\$pxe_server)/extracted/$rel_kernel ramdisk_size=16777216 vga=791 splash=silent ip=dhcp proxmox-iso=http://\$pxe_server/$http_dir/$rel_iso_url
         initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
@@ -369,7 +383,7 @@ EOF
         cat << EOF >> "$SYS_CFG"
     KERNEL http://$SERVER_IP/extracted/$rel_kernel
     INITRD http://$SERVER_IP/extracted/$rel_initrd
-    APPEND vga=791 splash=silent ip=dhcp proxmox-iso=http://$SERVER_IP/$http_dir/$rel_iso_url
+    APPEND ramdisk_size=16777216 vga=791 splash=silent ip=dhcp proxmox-iso=http://$SERVER_IP/$http_dir/$rel_iso_url
 EOF
     elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$SYS_CFG"
@@ -448,7 +462,7 @@ EOF
     elif [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
 echo [Ventoy] Carregando Proxmox VE Installer via HTTP...
-kernel http://$SERVER_IP/extracted/$rel_kernel vga=791 splash=silent ip=dhcp proxmox-iso=http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
+kernel http://$SERVER_IP/extracted/$rel_kernel ramdisk_size=16777216 vga=791 splash=silent ip=dhcp proxmox-iso=http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
@@ -545,7 +559,7 @@ LABEL local
 
 LABEL ipxe
     MENU LABEL [I] Iniciar iPXE Shell / Sanboot
-    KERNEL bios/undionly.kpxe
+    KERNEL /bios/undionly.kpxe
 
 LABEL reboot
     MENU LABEL [R] Reiniciar Computador

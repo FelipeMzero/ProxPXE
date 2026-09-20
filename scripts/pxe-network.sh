@@ -92,38 +92,47 @@ apply_dnsmasq_proxy() {
 # ====================================================
 # PROXPXE - MODO PROXYDHCP DINÂMICO
 # Gerado automaticamente de acordo com a rede do CT
+# Baseado na arquitetura do iVentoy/Ventoy PXE
 # ====================================================
 
+# Desativa DNS (modo PXE puro)
 port=0
+
+# Servidor TFTP
 enable-tftp
 tftp-root=/var/lib/tftpboot
-tftp-max=100
+tftp-max=150
+tftp-no-blocksize
 log-dhcp
 log-facility=/var/log/dnsmasq.log
 
 # Faixa ProxyDHCP calculada dinamicamente para esta rede
 dhcp-range=$SUBNET_ADDR,proxy,$NET_MASK
 
-# Detecção de Arquitetura de Cliente (Option 93)
+# Detecção de Arquitetura de Cliente (Option 93 - RFC 4578)
+# 0: Standard PC BIOS (Legacy)
 dhcp-match=set:bios,option:client-arch,0
+# 6: EFI IA32 (32-bit UEFI)
 dhcp-match=set:efi-ia32,option:client-arch,6
+# 7: EFI BC (x86-64 UEFI - tipo antigo)
 dhcp-match=set:efi-x64,option:client-arch,7
+# 9: EFI x86-64 (UEFI moderno - tipo mais comum)
 dhcp-match=set:efi-x64,option:client-arch,9
+# 11: EFI ARM64
 dhcp-match=set:efi-arm64,option:client-arch,11
 
-# Arquivos de Boot com o IP atual do servidor
+# Arquivos de Boot por arquitetura (com IP do servidor explícito)
 dhcp-boot=tag:bios,bios/lpxelinux.0,$HOST_IP,$HOST_IP
 dhcp-boot=tag:efi-ia32,uefi/grubnetia32.efi,$HOST_IP,$HOST_IP
 dhcp-boot=tag:efi-x64,uefi/grubnetx64.efi,$HOST_IP,$HOST_IP
 dhcp-boot=uefi/grubnetx64.efi,$HOST_IP,$HOST_IP
 
-# Menu PXE / ProxyDHCP (Porta 4011)
-pxe-prompt="Inicializando ProxPXE (Ventoy Edition)...", 2
-pxe-service=tag:bios,x86PC,"ProxPXE Ventoy (BIOS)",bios/lpxelinux.0
-pxe-service=tag:efi-x64,X86-64_EFI,"ProxPXE Ventoy (UEFI 64-bit)",uefi/grubnetx64.efi
-pxe-service=tag:efi-x64,9,"ProxPXE Ventoy (UEFI 64-bit)",uefi/grubnetx64.efi
-pxe-service=tag:efi-ia32,IA32_EFI,"ProxPXE Ventoy (UEFI 32-bit)",uefi/grubnetia32.efi
-pxe-service=X86-64_EFI,"ProxPXE Ventoy (UEFI 64-bit)",uefi/grubnetx64.efi
+# Serviços PXE anunciados (Porta 4011 - ProxyDHCP)
+pxe-prompt="Inicializando ProxPXE (iVentoy Edition)...", 2
+pxe-service=tag:bios,x86PC,"ProxPXE BIOS (Syslinux/lpxelinux)",bios/lpxelinux.0,$HOST_IP
+pxe-service=tag:efi-x64,X86-64_EFI,"ProxPXE UEFI 64-bit (GRUB2)",uefi/grubnetx64.efi,$HOST_IP
+pxe-service=tag:efi-x64,9,"ProxPXE UEFI 64-bit (GRUB2)",uefi/grubnetx64.efi,$HOST_IP
+pxe-service=tag:efi-ia32,IA32_EFI,"ProxPXE UEFI 32-bit (GRUB2)",uefi/grubnetia32.efi,$HOST_IP
 EOF
 
         if command -v systemctl >/dev/null 2>&1; then

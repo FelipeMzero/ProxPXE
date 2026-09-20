@@ -101,17 +101,29 @@ EOF
 
 # Compila binário UEFI x86_64 auto-contido
 if command -v grub-mkstandalone >/dev/null 2>&1; then
+    # Módulos UEFI: inclui suporte a rede (tftp/http), gráficos, fontes, ISO e chain loading
     grub-mkstandalone \
         -O x86_64-efi \
         -o /var/lib/tftpboot/uefi/grubnetx64.efi \
-        --modules="tftp http efinet net all_video font gfxterm gfxmenu png cat configfile test sleep linux echo normal reboot halt chain true progress" \
+        --modules="tftp http efinet net all_video font gfxterm gfxmenu png cat configfile test sleep linux linuxefi echo normal reboot halt chain true loopback iso9660 part_msdos part_gpt" \
+        "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || \
+    grub-mkstandalone \
+        -O x86_64-efi \
+        -o /var/lib/tftpboot/uefi/grubnetx64.efi \
+        --modules="tftp http efinet net all_video font gfxterm gfxmenu png cat configfile test sleep linux echo normal reboot halt chain true" \
         "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || true
 
     # Compila binário BIOS i386-pc-pxe auto-contido
+    # Nota: módulo 'pxe' não existe separadamente no i386-pc-pxe (já é embutido)
     grub-mkstandalone \
         -O i386-pc-pxe \
         -o /var/lib/tftpboot/bios/grub.0 \
-        --modules="pxe tftp http all_video vbe vga font gfxterm gfxmenu png cat configfile test sleep linux linux16 echo normal reboot halt chain true progress" \
+        --modules="tftp http all_video vbe vga font gfxterm gfxmenu png cat configfile test sleep linux linux16 echo normal reboot halt chain true loopback iso9660 part_msdos part_gpt" \
+        "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || \
+    grub-mkstandalone \
+        -O i386-pc-pxe \
+        -o /var/lib/tftpboot/bios/grub.0 \
+        --modules="tftp http all_video vbe vga font gfxterm gfxmenu png cat configfile test sleep linux linux16 echo normal reboot halt chain true" \
         "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || true
 fi
 rm -f "$EARLY_CFG"
