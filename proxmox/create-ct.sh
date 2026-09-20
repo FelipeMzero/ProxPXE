@@ -11,9 +11,11 @@ set -euo pipefail
 # Cores do terminal
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
 CYAN='\033[0;36m'
+WHITE='\033[1;37m'
 BOLD='\033[1m'
 NC='\033[0m'
 
@@ -231,9 +233,9 @@ fi
 # EXECUÇÃO DA INSTALAÇÃO
 # ==============================================================================
 clear
-echo -e "${MAGENTA}==============================================================================${NC}"
-echo -e "${CYAN}${BOLD}     PROXPXE - CRIANDO E CONFIGURANDO O CONTAINER LXC NO PROXMOX VE           ${NC}"
-echo -e "${MAGENTA}==============================================================================${NC}"
+echo -e "${CYAN}==============================================================================${NC}"
+echo -e "${WHITE}${BOLD}       PROXPXE - CRIANDO E CONFIGURANDO O CONTAINER LXC NO PROXMOX VE         ${NC}"
+echo -e "${CYAN}==============================================================================${NC}"
 
 # 1. Download do Template Debian 12
 echo -e "\n${BLUE}[1/5] Atualizando lista de templates e verificando Debian 12...${NC}"
@@ -251,12 +253,14 @@ fi
 
 LOCAL_TEMPLATE_PATH="/var/lib/vz/template/cache/${DEBIAN_TEMPLATE}"
 if [ ! -f "$LOCAL_TEMPLATE_PATH" ]; then
-    echo -e "${CYAN}Baixando template oficial: ${DEBIAN_TEMPLATE}...${NC}"
+    echo -e "${CYAN}Baixando template Debian 12 oficial (${DEBIAN_TEMPLATE})...${NC}"
     pveam download "$TEMPLATE_STORAGE" "$DEBIAN_TEMPLATE"
+else
+    echo -e "${GREEN}[OK] Template Debian 12 já disponível em cache local.${NC}"
 fi
 
 # 2. Criação do Container
-echo -e "\n${BLUE}[2/5] Criando Container LXC (CT $CT_ID) no storage $CT_STORAGE...${NC}"
+echo -e "\n${BLUE}[2/5] Criando Container LXC (CT $CT_ID - $CT_HOSTNAME) no storage $CT_STORAGE...${NC}"
 pct create "$CT_ID" "${TEMPLATE_STORAGE}:vztmpl/${DEBIAN_TEMPLATE}" \
     -ostype debian \
     -hostname "$CT_HOSTNAME" \
@@ -275,53 +279,80 @@ if [ "$NET_CHOICE" = "2" ] && [ -n "${STATIC_DNS:-}" ]; then
 fi
 
 if [ "$BIND_ISO" -eq 1 ]; then
-    echo -e "${GREEN}Montando pasta de ISOs nativas do Proxmox em /data/iso do container...${NC}"
+    echo -e "${GREEN}[OK] Compartilhando pasta de ISOs nativas do Proxmox ($PVE_ISO_DIR) em /data/iso...${NC}"
     pct set "$CT_ID" -mp0 "${PVE_ISO_DIR},mp=/data/iso"
 fi
+echo -e "${GREEN}[OK] Container LXC $CT_ID criado com sucesso!${NC}"
 
 # 3. Iniciar Container
-echo -e "\n${BLUE}[3/5] Inicializando Container LXC...${NC}"
+echo -e "\n${BLUE}[3/5] Inicializando Container LXC e aguardando conexão de rede...${NC}"
 pct start "$CT_ID"
 
 echo -e "Aguardando conectividade de rede do container..."
 for i in {1..30}; do
     if pct exec "$CT_ID" -- ping -c 1 1.1.1.1 >/dev/null 2>&1; then
-        echo -e "${GREEN}Rede conectada com sucesso!${NC}"
+        echo -e "${GREEN}[OK] Rede conectada com sucesso!${NC}"
         break
     fi
     sleep 1
 done
 
 # 4. Clonar e Instalar ProxPXE
-echo -e "\n${BLUE}[4/5] Clonando e instalando ProxPXE dentro do Container...${NC}"
+echo -e "\n${BLUE}[4/5] Clonando e instalando componentes do ProxPXE dentro do Container...${NC}"
 pct exec "$CT_ID" -- apt-get update -y
 pct exec "$CT_ID" -- apt-get install -y git curl
 
 pct exec "$CT_ID" -- rm -rf /tmp/pxe-setup
 pct exec "$CT_ID" -- git clone https://github.com/FelipeMzero/ProxPXE.git /tmp/pxe-setup
 pct exec "$CT_ID" -- bash /tmp/pxe-setup/install.sh
+echo -e "${GREEN}[OK] ProxPXE e serviços configurados com sucesso!${NC}"
 
 # 5. Obtém IP Final
-CT_FINAL_IP=$(pct exec "$CT_ID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "IP-Pendente")
+echo -e "\n${BLUE}[5/5] Detectando endereço IP do Container ProxPXE...${NC}"
+CT_FINAL_IP=""
+for i in {1..20}; do
+    CT_FINAL_IP=$(pct exec "$CT_ID" -- ip -4 -o addr show eth0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n1 || true)
+    if [ -n "$CT_FINAL_IP" ] && [ "$CT_FINAL_IP" != "127.0.0.1" ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ -z "$CT_FINAL_IP" ]; then
+    CT_FINAL_IP=$(pct exec "$CT_ID" -- hostname -I 2>/dev/null | awk '{print $1}' || echo "")
+fi
+
+if [ -z "$CT_FINAL_IP" ]; then
+    CT_FINAL_IP="<IP-DO-CONTAINER>"
+fi
 
 # Tela final em Whiptail
 FINAL_MSG="Instalação do ProxPXE concluída com sucesso!\n\n"
-FINAL_MSG+="  • Container ID:   $CT_ID ($CT_HOSTNAME)\n"
-FINAL_MSG+="  • Painel Web:     http://$CT_FINAL_IP\n"
-FINAL_MSG+="  • Usuário Padrão: admin\n"
-FINAL_MSG+="  • Senha Padrão:   admin\n"
-FINAL_MSG+="  • Modo DHCP:      ProxyDHCP (Porta 4011 - Seguro!)\n\n"
-FINAL_MSG+="Agora basta abrir http://$CT_FINAL_IP no navegador para gerenciar as ISOs e temas!\n"
-FINAL_MSG+="Para dar boot nas máquinas clientes, aperte F12 e selecione Network Boot (PXE)."
+FINAL_MSG+="  • Container ID:         $CT_ID ($CT_HOSTNAME)\n"
+FINAL_MSG+="  • Status:               ATIVO E RODANDO\n"
+FINAL_MSG+="  • Painel de Controle:   http://$CT_FINAL_IP\n"
+FINAL_MSG+="  • Usuário Padrão:       admin\n"
+FINAL_MSG+="  • Senha Padrão:         admin\n"
+FINAL_MSG+="  • Modo de Rede PXE:     ProxyDHCP (Porta 4011 - Seguro!)\n\n"
+FINAL_MSG+="Você já pode abrir http://$CT_FINAL_IP no seu navegador!\n"
+FINAL_MSG+="Para dar boot nas máquinas clientes, tecle F12 e selecione Network Boot (PXE)."
 
-whiptail --title "$TITLE - Concluído!" --msgbox "$FINAL_MSG" 18 70
+whiptail --title "$TITLE - Instalação Concluída!" --msgbox "$FINAL_MSG" 18 72 || true
 
-clear
-echo -e "${GREEN}==============================================================================${NC}"
+# Exibe o resumo final destacado na tela sem limpar o histórico do terminal
+echo -e "\n${GREEN}==============================================================================${NC}"
 echo -e "${GREEN}${BOLD}           PARABÉNS! PROXPXE INSTALADO COM SUCESSO NO PROXMOX VE!             ${NC}"
 echo -e "${GREEN}==============================================================================${NC}"
-echo -e "  Container ID:             ${CYAN}${CT_ID} (${CT_HOSTNAME})${NC}"
+echo -e "  Status do Container:      ${GREEN}${BOLD}ATIVO E OPERACIONAL${NC} (CT ${BOLD}$CT_ID${NC} - ${BOLD}$CT_HOSTNAME${NC})"
 echo -e "  Storage Utilizado:        ${CYAN}${CT_STORAGE} (${CT_DISK} GB)${NC}"
-echo -e "  Painel de Controle Web:   ${GREEN}http://${CT_FINAL_IP}${NC}"
-echo -e "  Credenciais do Painel:    Usuário: ${BOLD}admin${NC} | Senha: ${BOLD}admin${NC}"
+echo -e "  Memória RAM / SWAP:       ${CYAN}${CT_RAM} MB RAM / ${CT_SWAP} MB SWAP${NC}"
+echo -e "------------------------------------------------------------------------------"
+echo -e "  ${WHITE}${BOLD}🌐 ENDEREÇO DE ACESSO AO PAINEL WEB:${NC}"
+echo -e "     URL:                   ${GREEN}${BOLD}http://${CT_FINAL_IP}${NC}"
+echo -e "     Usuário Padrão:        ${BOLD}admin${NC}"
+echo -e "     Senha Padrão:          ${BOLD}admin${NC}"
+echo -e "------------------------------------------------------------------------------"
+echo -e "  ${YELLOW}${BOLD}📡 INICIALIZAÇÃO DE COMPUTADORES POR REDE (PXE):${NC}"
+echo -e "     Modo de Operação:      ${YELLOW}ProxyDHCP (Porta 4011)${NC} - Não altera o roteador da sua rede!"
+echo -e "     Como usar:             Ligue qualquer máquina e pressione ${CYAN}${BOLD}F12${NC} (Network Boot)"
 echo -e "${GREEN}==============================================================================${NC}\n"
