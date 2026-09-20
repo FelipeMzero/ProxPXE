@@ -343,7 +343,7 @@
                     <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <i class="fa-solid fa-compact-disc text-medical-600"></i> Imagens ISO Cadastradas no ProxPXE
                     </h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Arquivos disponíveis na pasta /data/iso/</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Arquivos unificados de /data/iso/ (Local) e /data/proxmox-iso/ (Proxmox Host)</p>
                 </div>
                 <button onclick="fetchIsos()" class="text-xs bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 font-medium">
                     <i class="fa-solid fa-rotate-right"></i> Atualizar Lista
@@ -480,9 +480,10 @@
                         <td class="p-3 font-mono text-slate-500">${i.filename}</td>
                         <td class="p-3 font-medium">${i.size_mb} MB</td>
                         <td class="p-3 text-right">
-                            <button onclick="deleteIso('${i.filename}')" class="text-slate-400 hover:text-red-600 p-1" title="Excluir">
-                                <i class="fa-solid fa-trash-can"></i>
-                            </button>
+                            ${i.source === 'Proxmox' 
+                                ? `<span class="text-slate-400 p-1 text-xs" title="ISO do Proxmox (Host)"><i class="fa-solid fa-lock"></i></span>` 
+                                : `<button onclick="deleteIso('${i.filename}')" class="text-slate-400 hover:text-red-600 p-1" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>`
+                            }
                         </td>
                     </tr>
                 `).join('');

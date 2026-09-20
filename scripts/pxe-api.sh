@@ -8,6 +8,7 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${CONFIG_DIR:-/data/config}"
 ISO_DIR="${ISO_DIR:-/data/iso}"
+PVE_ISO_DIR="${PVE_ISO_DIR:-/data/proxmox-iso}"
 
 echo "Content-Type: application/json; charset=utf-8"
 echo "Access-Control-Allow-Origin: *"
@@ -88,7 +89,12 @@ EOF
         DISK_INFO=$(df -h /data 2>/dev/null | awk 'NR==2 {print $2 "|" $3 "|" $4 "|" $5}' || echo "0G|0G|0G|0%")
         IFS='|' read -r DISK_TOT DISK_USED DISK_FREE DISK_PCT <<< "$DISK_INFO"
         
-        ISO_COUNT=$(ls -1 "$ISO_DIR"/*.iso 2>/dev/null | wc -l || echo "0")
+        LOCAL_COUNT=$(find -L "$ISO_DIR" -type f \( -iname "*.iso" -o -iname "*.img" \) 2>/dev/null | wc -l || echo "0")
+        PVE_COUNT=0
+        if [ -d "$PVE_ISO_DIR" ]; then
+            PVE_COUNT=$(find -L "$PVE_ISO_DIR" -type f \( -iname "*.iso" -o -iname "*.img" \) 2>/dev/null | wc -l || echo "0")
+        fi
+        ISO_COUNT=$((LOCAL_COUNT + PVE_COUNT))
         CLIENTS_COUNT=$(ls -1 /tmp/client_*.info 2>/dev/null | wc -l || echo "0")
 
         cat << EOF
@@ -113,6 +119,9 @@ EOF
         ;;
 
     *"/api/isos"*)
+        if [ ! -s "$CONFIG_DIR/isos.json" ]; then
+            bash "$SCRIPT_DIR/pxe-scan.sh" >/dev/null 2>&1 || true
+        fi
         if [ -f "$CONFIG_DIR/isos.json" ]; then
             cat "$CONFIG_DIR/isos.json"
         else

@@ -210,13 +210,44 @@ fi
 # ==============================================================================
 # 9. ARMAZENAMENTO DE ISOS (PASTA PRÓPRIA + COMPARTILHAMENTO DO PROXMOX)
 # ==============================================================================
-PVE_ISO_DIR="/var/lib/vz/template/iso"
-BIND_ISO=0
+PVE_ISO_CANDIDATES=()
+for d in /var/lib/vz/template/iso /mnt/pve/*/template/iso /mnt/*/template/iso /var/lib/pve/*/template/iso; do
+    [ -d "$d" ] && PVE_ISO_CANDIDATES+=("$d")
+done
+if [ -f /etc/pve/storage.cfg ]; then
+    while IFS= read -r st_path; do
+        if [ -n "$st_path" ] && [ -d "$st_path/template/iso" ]; then
+            PVE_ISO_CANDIDATES+=("$st_path/template/iso")
+        fi
+    done < <(grep -E '^[[:space:]]*path[[:space:]]+' /etc/pve/storage.cfg 2>/dev/null | awk '{print $2}')
+fi
 
+PVE_UNIQUE_DIRS=($(printf "%s\n" "${PVE_ISO_CANDIDATES[@]}" 2>/dev/null | sort -u))
+
+PVE_ISO_DIR=""
+for cand in "${PVE_UNIQUE_DIRS[@]}"; do
+    ISO_CNT=$(find -L "$cand" -maxdepth 2 -type f \( -iname "*.iso" -o -iname "*.img" \) 2>/dev/null | wc -l)
+    if [ "$ISO_CNT" -gt 0 ]; then
+        PVE_ISO_DIR="$cand"
+        break
+    fi
+done
+
+if [ -z "$PVE_ISO_DIR" ]; then
+    if [ -d "/var/lib/vz/template/iso" ]; then
+        PVE_ISO_DIR="/var/lib/vz/template/iso"
+    elif [ ${#PVE_UNIQUE_DIRS[@]} -gt 0 ]; then
+        PVE_ISO_DIR="${PVE_UNIQUE_DIRS[0]}"
+    fi
+fi
+PVE_ISO_DIR=${PVE_ISO_DIR:-"/var/lib/vz/template/iso"}
+
+BIND_ISO=0
 if [ -d "$PVE_ISO_DIR" ]; then
     BIND_ISO=1
+    chmod -R o+rX "$PVE_ISO_DIR" 2>/dev/null || true
     whiptail --title "$TITLE - Armazenamento de ISOs Híbrido" \
-        --msgbox "Armazenamento Híbrido Configurado Automaticamente:\n\n1. Pasta Própria (/data/iso):\n   Criada no storage '$CT_STORAGE' pronta para Upload pelo Navegador e Download via Link (URL).\n\n2. Compartilhamento Proxmox (/data/proxmox-iso):\n   Monta as ISOs já existentes de $PVE_ISO_DIR diretamente no container, economizando espaço em disco!\n\nAmbos os diretórios serão unificados no Menu de Boot e no Painel Web!" 16 75 || true
+        --msgbox "Armazenamento Híbrido Configurado Automaticamente:\n\n1. Pasta Própria (/data/iso):\n   Criada no storage '$CT_STORAGE' pronta para Upload pelo Navegador e Download via Link (URL).\n\n2. Compartilhamento Proxmox (/data/proxmox-iso):\n   Monta as ISOs detectadas em '$PVE_ISO_DIR' diretamente no container, economizando espaço em disco!\n\nAmbos os diretórios serão unificados no Menu de Boot e no Painel Web!" 16 75 || true
 fi
 
 # ==============================================================================

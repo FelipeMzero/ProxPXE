@@ -42,6 +42,15 @@ Se você já possui o container criado e quer apenas atualizar a aplicação e o
 pct exec <ID> -- bash -c "rm -rf /tmp/pxe-setup && git clone https://github.com/FelipeMzero/ProxPXE.git /tmp/pxe-setup && bash /tmp/pxe-setup/install.sh"
 ```
 
+### 💿 Como Vincular a Pasta de ISOs do Proxmox no Container Existente
+
+Se o container já está criado e você quer que ele enxergue as ISOs salvas no Proxmox VE (seja em `local`, `hrmj-migration`, etc.), execute no **Shell do Proxmox**:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/FelipeMzero/ProxPXE/main/proxmox/mount-iso.sh)"
+```
+*(O assistente localiza automaticamente todos os storages do Proxmox com ISOs, ajusta as permissões, configura o ponto de montagem `mp0`, reinicia o container para aplicar o mount do LXC e indexa todas as ISOs).*
+
 ---
 
 ## 🔐 Acesso ao Container & Credenciais Padrão

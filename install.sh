@@ -49,6 +49,7 @@ log_ok "Pacotes do sistema instalados com sucesso!"
 
 log_step "2/6: Criando estrutura de pastas de dados e boot..."
 mkdir -p /data/iso
+mkdir -p /data/proxmox-iso
 mkdir -p /data/extracted
 mkdir -p /data/theme/fonts
 mkdir -p /data/theme/icons
@@ -61,6 +62,7 @@ mkdir -p /var/lib/tftpboot/theme
 chown -R www-data:www-data /data 2>/dev/null || true
 chmod -R 775 /data
 chmod -R 777 /data/iso /data/config /data/extracted 2>/dev/null || true
+chmod -R o+rX /data/proxmox-iso 2>/dev/null || true
 chmod -R 755 /var/lib/tftpboot
 
 log_step "3/6: Compilando ambiente de Boot GRUB2 Netboot (UEFI & BIOS) e iPXE..."
@@ -219,6 +221,7 @@ chmod 777 /tmp/proxpxe_sessions 2>/dev/null || true
 # Garante permissões finais para o Nginx e fcgiwrap (upload e download de ISOs)
 chown -R www-data:www-data /data 2>/dev/null || true
 chmod -R 777 /data/iso /data/config /data/extracted 2>/dev/null || true
+chmod -R o+rX /data/proxmox-iso 2>/dev/null || true
 
 systemctl enable --now fcgiwrap
 systemctl restart fcgiwrap

@@ -38,10 +38,10 @@ cat << EOF
 EOF
 
 first=1
-for file in "$ISO_DIR"/*.iso "$ISO_DIR"/*.img "$PVE_ISO_DIR"/*.iso "$PVE_ISO_DIR"/*.img; do
+while IFS= read -r file; do
     [ -f "$file" ] || continue
     name=$(basename "$file")
-    size_mb=$(du -m "$file" | cut -f1)
+    size_mb=$(du -m "$file" 2>/dev/null | cut -f1 || echo "0")
     if [ $first -eq 0 ]; then echo "," ; fi
     first=0
     cat << EOF
@@ -51,7 +51,7 @@ for file in "$ISO_DIR"/*.iso "$ISO_DIR"/*.img "$PVE_ISO_DIR"/*.iso "$PVE_ISO_DIR
       "size_gb": $(awk "BEGIN {printf \"%.2f\", $size_mb/1024}")
     }
 EOF
-done
+done < <(find -L "$ISO_DIR" "$PVE_ISO_DIR" -type f \( -iname "*.iso" -o -iname "*.img" \) 2>/dev/null)
 
 cat << 'EOF'
   ]

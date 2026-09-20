@@ -125,16 +125,25 @@ ISO_COUNT=0
 IPXE_TARGETS="/tmp/ipxe_targets_$$.tmp"
 > "$IPXE_TARGETS"
 
+# Garante permissões de leitura no diretório de ISOs
+chmod -R o+rX "$ISO_DIR" "$PVE_ISO_DIR" 2>/dev/null || true
+
 # Coleta ISOs tanto da pasta local quanto do Proxmox compartilhado
 shopt -s nullglob nocaseglob
 RAW_ISOS=()
-for f in "$ISO_DIR"/*.iso "$ISO_DIR"/*.img; do
-    [ -f "$f" ] && RAW_ISOS+=("$f|Local|iso")
-done
+
+# 1. Pasta local /data/iso
+if [ -d "$ISO_DIR" ]; then
+    while IFS= read -r f; do
+        [ -f "$f" ] && RAW_ISOS+=("$f|Local|iso")
+    done < <(find -L "$ISO_DIR" -type f \( -iname "*.iso" -o -iname "*.img" \) 2>/dev/null)
+fi
+
+# 2. Pasta Proxmox /data/proxmox-iso
 if [ -d "$PVE_ISO_DIR" ]; then
-    for f in "$PVE_ISO_DIR"/*.iso "$PVE_ISO_DIR"/*.img; do
+    while IFS= read -r f; do
         [ -f "$f" ] && RAW_ISOS+=("$f|Proxmox|proxmox-iso")
-    done
+    done < <(find -L "$PVE_ISO_DIR" -type f \( -iname "*.iso" -o -iname "*.img" \) 2>/dev/null)
 fi
 
 for item in "${RAW_ISOS[@]}"; do
@@ -143,6 +152,12 @@ for item in "${RAW_ISOS[@]}"; do
     
     ISO_COUNT=$((ISO_COUNT + 1))
     iso_name=$(basename "$iso_path")
+    if [ "$http_dir" = "proxmox-iso" ]; then
+        rel_iso_url="${iso_path#$PVE_ISO_DIR/}"
+    else
+        rel_iso_url="${iso_path#$ISO_DIR/}"
+    fi
+    rel_iso_url=$(echo "$rel_iso_url" | sed 's#^/##')
     iso_lower=$(echo "$iso_name" | tr '[:upper:]' '[:lower:]')
     iso_slug=$(echo "$iso_name" | sed 's/[^a-zA-Z0-9_\-]/_/g')
     iso_size=$(du -m "$iso_path" | cut -f1 2>/dev/null || echo "0")
@@ -222,19 +237,19 @@ EOF
     elif [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando Ubuntu Live HTTP..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel ip=dhcp url=http://\$pxe_server/$http_dir/$iso_name ds=nocloud-net ---
+    linux (http,\$pxe_server)/extracted/$rel_kernel ip=dhcp url=http://\$pxe_server/$http_dir/$rel_iso_url ds=nocloud-net ---
     initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando Debian Live..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live components fetch=http://\$pxe_server/$http_dir/$iso_name
+    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live components fetch=http://\$pxe_server/$http_dir/$rel_iso_url
     initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando Clonezilla..."
-    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://\$pxe_server/$http_dir/$iso_name
+    linux (http,\$pxe_server)/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://\$pxe_server/$http_dir/$rel_iso_url
     initrd (http,\$pxe_server)/extracted/$rel_initrd
 EOF
     elif [ "$os_type" = "windows" ]; then
@@ -247,7 +262,7 @@ EOF
         cat << EOF >> "$GRUB_CFG"
     echo "Carregando $iso_name em RAM (Memdisk)..."
     linux16 (http,\$pxe_server)/memdisk iso raw
-    initrd16 (http,\$pxe_server)/$http_dir/$iso_name
+    initrd16 (http,\$pxe_server)/$http_dir/$rel_iso_url
 EOF
     fi
 
@@ -264,13 +279,13 @@ EOF
         cat << EOF >> "$SYS_CFG"
     KERNEL http://$SERVER_IP/extracted/$rel_kernel
     INITRD http://$SERVER_IP/extracted/$rel_initrd
-    APPEND ip=dhcp url=http://$SERVER_IP/$http_dir/$iso_name ds=nocloud-net ---
+    APPEND ip=dhcp url=http://$SERVER_IP/$http_dir/$rel_iso_url ds=nocloud-net ---
 EOF
     elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$SYS_CFG"
     KERNEL http://$SERVER_IP/extracted/$rel_kernel
     INITRD http://$SERVER_IP/extracted/$rel_initrd
-    APPEND boot=live components fetch=http://$SERVER_IP/$http_dir/$iso_name
+    APPEND boot=live components fetch=http://$SERVER_IP/$http_dir/$rel_iso_url
 EOF
     elif [ "$os_type" = "proxmox" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$SYS_CFG"
@@ -282,12 +297,12 @@ EOF
         cat << EOF >> "$SYS_CFG"
     KERNEL http://$SERVER_IP/extracted/$rel_kernel
     INITRD http://$SERVER_IP/extracted/$rel_initrd
-    APPEND boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$iso_name
+    APPEND boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$rel_iso_url
 EOF
     else
         cat << EOF >> "$SYS_CFG"
     KERNEL memdisk
-    INITRD http://$SERVER_IP/$http_dir/$iso_name
+    INITRD http://$SERVER_IP/$http_dir/$rel_iso_url
     APPEND iso raw
 EOF
     fi
@@ -302,14 +317,14 @@ EOF
     if [ "$os_type" = "ubuntu" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
 echo Carregando Ubuntu Kernel e Initrd via HTTP...
-kernel http://$SERVER_IP/extracted/$rel_kernel ip=dhcp url=http://$SERVER_IP/$http_dir/$iso_name ds=nocloud-net --- || goto failed
+kernel http://$SERVER_IP/extracted/$rel_kernel ip=dhcp url=http://$SERVER_IP/$http_dir/$rel_iso_url ds=nocloud-net --- || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
     elif [ "$os_type" = "debian" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
 echo Carregando Debian Live via HTTP...
-kernel http://$SERVER_IP/extracted/$rel_kernel boot=live components fetch=http://$SERVER_IP/$http_dir/$iso_name || goto failed
+kernel http://$SERVER_IP/extracted/$rel_kernel boot=live components fetch=http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
@@ -323,7 +338,7 @@ EOF
     elif [ "$os_type" = "clonezilla" ] && [ -n "${rel_kernel:-}" ]; then
         cat << EOF >> "$IPXE_TARGETS"
 echo Carregando Clonezilla Live via HTTP...
-kernel http://$SERVER_IP/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$iso_name || goto failed
+kernel http://$SERVER_IP/extracted/$rel_kernel boot=live config noswap edd=on nomodeset locales=pt_BR.UTF-8 keyboard-layouts=br fetch=http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
 initrd http://$SERVER_IP/extracted/$rel_initrd || goto failed
 boot
 EOF
@@ -331,7 +346,7 @@ EOF
         cat << EOF >> "$IPXE_TARGETS"
 echo Carregando $iso_name via Memdisk (RAM)...
 kernel http://$SERVER_IP/memdisk iso raw || goto failed
-initrd http://$SERVER_IP/$http_dir/$iso_name || goto failed
+initrd http://$SERVER_IP/$http_dir/$rel_iso_url || goto failed
 boot
 EOF
     fi
@@ -350,7 +365,7 @@ EOF
     "os_type": "$os_type",
     "icon": "$os_class",
     "source": "$iso_source",
-    "http_url": "/$http_dir/$iso_name"
+    "http_url": "/$http_dir/$rel_iso_url"
   }
 EOF
 
