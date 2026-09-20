@@ -50,12 +50,21 @@ echo "==> [PROXPXE-THEME] Carregando tema a partir de $INI_FILE..."
 echo "    -> Organização: $ORGANIZATION"
 echo "    -> Paleta: Branco e Azul Hospitalar | Fonte: $FONT_FAMILY ($FONT_SIZE)"
 
-# 1. Converte fontes para .pf2 se grub-mkfont estiver disponível
+# 1. Copia unicode.pf2 padrão do sistema Debian se disponível
+for uni in /usr/share/grub/unicode.pf2 /usr/lib/grub/unicode.pf2; do
+    if [ -f "$uni" ]; then
+        cp -f "$uni" "$FONTS_DIR/unicode.pf2" 2>/dev/null || true
+        break
+    fi
+done
+
+# 2. Converte fontes para .pf2 se grub-mkfont estiver disponível
 if command -v grub-mkfont >/dev/null 2>&1; then
     # Converte Outfit.ttf se existir
-    if [ -f "$FONTS_DIR/Outfit.ttf" ] && [ ! -f "$FONTS_DIR/Outfit.pf2" ]; then
+    if [ -f "$FONTS_DIR/Outfit.ttf" ]; then
         echo "    -> Convertendo Outfit.ttf para Outfit.pf2..."
-        grub-mkfont -s "$FONT_SIZE" -o "$FONTS_DIR/Outfit.pf2" "$FONTS_DIR/Outfit.ttf" || true
+        grub-mkfont --name="Outfit" -s "$FONT_SIZE" -o "$FONTS_DIR/Outfit.pf2" "$FONTS_DIR/Outfit.ttf" || true
+        grub-mkfont --name="Outfit" -s 11 -o "$FONTS_DIR/Outfit-11.pf2" "$FONTS_DIR/Outfit.ttf" || true
     fi
 
     # Converte outras fontes
@@ -69,7 +78,7 @@ if command -v grub-mkfont >/dev/null 2>&1; then
     done
 fi
 
-# 2. Localiza fonte ativa
+# 3. Localiza fonte ativa
 ACTIVE_FONT="$FONT_FAMILY"
 if [ ! -f "$FONTS_DIR/$ACTIVE_FONT.pf2" ]; then
     FIRST_PF2=$(find "$FONTS_DIR" -name "*.pf2" 2>/dev/null | head -n1 || true)
@@ -78,7 +87,7 @@ if [ ! -f "$FONTS_DIR/$ACTIVE_FONT.pf2" ]; then
     fi
 fi
 
-# 3. Gera o arquivo theme.txt com cores claras (Branco e Azul Menino Jesus)
+# 4. Gera o arquivo theme.txt com cores claras (Branco e Azul Menino Jesus)
 cat << EOF > "$THEME_DIR/theme.txt"
 # ==========================================
 # ProxPXE Ventoy-Style GRUB2 Theme
@@ -88,7 +97,6 @@ cat << EOF > "$THEME_DIR/theme.txt"
 title-text: ""
 desktop-image: "background.png"
 desktop-color: "$BG_COLOR"
-terminal-box: "terminal_box_*.png"
 
 # Caixa Central de Menu Estilo Ventoy
 + boot_menu {
@@ -105,7 +113,6 @@ terminal-box: "terminal_box_*.png"
     icon_height = 24
     item_icon_space = 12
     selected_item_pixmap_style = "select_*.png"
-    menu_pixmap_style = "box_*.png"
 }
 
 # Logo do Sistema no Topo (Hospital Menino Jesus)
@@ -142,9 +149,13 @@ terminal-box: "terminal_box_*.png"
 }
 EOF
 
-# 4. Sincroniza arquivos de tema com o TFTP
+# 5. Sincroniza arquivos de tema e fontes com o TFTP
 if [ -d "$TFTP_THEME" ]; then
     cp -r "$THEME_DIR"/* "$TFTP_THEME/" 2>/dev/null || true
 fi
+mkdir -p /var/lib/tftpboot/grub/fonts /var/lib/tftpboot/theme/fonts 2>/dev/null || true
+cp -f "$FONTS_DIR"/*.pf2 /var/lib/tftpboot/grub/fonts/ 2>/dev/null || true
+cp -f "$FONTS_DIR"/*.pf2 /var/lib/tftpboot/theme/fonts/ 2>/dev/null || true
+cp -f "$FONTS_DIR"/unicode.pf2 /var/lib/tftpboot/grub/ 2>/dev/null || true
 
 echo "==> [PROXPXE-THEME] Tema atualizado com sucesso a partir do theme.ini!"

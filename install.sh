@@ -66,25 +66,46 @@ chmod -R o+rX /data/proxmox-iso 2>/dev/null || true
 chmod -R 755 /var/lib/tftpboot
 
 log_step "3/6: Compilando ambiente de Boot GRUB2 Netboot (UEFI & BIOS) e iPXE..."
-mkdir -p /var/lib/tftpboot/uefi /var/lib/tftpboot/bios /var/lib/tftpboot/grub/fonts /var/lib/tftpboot/theme
+mkdir -p /var/lib/tftpboot/uefi /var/lib/tftpboot/bios /var/lib/tftpboot/grub/fonts /var/lib/tftpboot/theme/fonts /var/lib/tftpboot/grub/i386-pc /var/lib/tftpboot/grub/x86_64-efi
 
-# 1. Compila binário UEFI x86_64 auto-contido usando grub-mkstandalone
+# 1. Configuração inicial embutida (Early Config)
 EARLY_CFG="/tmp/early_grub.cfg"
 cat << 'EOF' > "$EARLY_CFG"
-set prefix=(tftp)/grub
-set root=(tftp)
-if [ -s (tftp)/grub/grub.cfg ]; then
+if [ -z "$root" ] || [ "$root" = "" ]; then
+    if [ -d (tftp) ]; then
+        set root=(tftp)
+    elif [ -d (pxe) ]; then
+        set root=(pxe)
+    fi
+fi
+if [ -s ($root)/grub/grub.cfg ]; then
+    set prefix=($root)/grub
+    configfile ($root)/grub/grub.cfg
+elif [ -s (tftp)/grub/grub.cfg ]; then
+    set prefix=(tftp)/grub
     configfile (tftp)/grub/grub.cfg
+elif [ -s (pxe)/grub/grub.cfg ]; then
+    set prefix=(pxe)/grub
+    configfile (pxe)/grub/grub.cfg
 elif [ -s (tftp)/grub.cfg ]; then
+    set prefix=(tftp)
     configfile (tftp)/grub.cfg
 fi
 EOF
 
+# Compila binário UEFI x86_64 auto-contido
 if command -v grub-mkstandalone >/dev/null 2>&1; then
     grub-mkstandalone \
         -O x86_64-efi \
         -o /var/lib/tftpboot/uefi/grubnetx64.efi \
         --modules="tftp http efinet net all_video font gfxterm gfxmenu png cat configfile test sleep linux echo" \
+        "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || true
+
+    # Compila binário BIOS i386-pc-pxe auto-contido
+    grub-mkstandalone \
+        -O i386-pc-pxe \
+        -o /var/lib/tftpboot/bios/grub.0 \
+        --modules="pxe tftp http all_video vbe vga font gfxterm gfxmenu png cat configfile test sleep linux linux16 echo" \
         "/boot/grub/grub.cfg=$EARLY_CFG" 2>/dev/null || true
 fi
 rm -f "$EARLY_CFG"
@@ -92,7 +113,18 @@ rm -f "$EARLY_CFG"
 # 2. Executa também grub-mknetdir como garantia de estrutura completa
 grub-mknetdir --net-directory=/var/lib/tftpboot --subdir=/grub 2>/dev/null || true
 
-# 3. Fallbacks caso o binário não tenha sido gerado ou esteja zerado
+# 3. Garante que core.0 (BIOS GRUB2) esteja presente e espelhado
+if [ ! -s /var/lib/tftpboot/grub/i386-pc/core.0 ] && [ -s /var/lib/tftpboot/bios/grub.0 ]; then
+    cp /var/lib/tftpboot/bios/grub.0 /var/lib/tftpboot/grub/i386-pc/core.0
+fi
+if [ -s /var/lib/tftpboot/grub/i386-pc/core.0 ]; then
+    cp -f /var/lib/tftpboot/grub/i386-pc/core.0 /var/lib/tftpboot/bios/grub.0 2>/dev/null || true
+    cp -f /var/lib/tftpboot/grub/i386-pc/core.0 /var/lib/tftpboot/bios/core.0 2>/dev/null || true
+    cp -f /var/lib/tftpboot/grub/i386-pc/core.0 /var/lib/tftpboot/core.0 2>/dev/null || true
+    cp -f /var/lib/tftpboot/grub/i386-pc/core.0 /var/lib/tftpboot/grub.0 2>/dev/null || true
+fi
+
+# Fallbacks UEFI
 if [ ! -s /var/lib/tftpboot/uefi/grubnetx64.efi ]; then
     if [ -s /var/lib/tftpboot/grub/x86_64-efi/core.efi ]; then
         cp /var/lib/tftpboot/grub/x86_64-efi/core.efi /var/lib/tftpboot/uefi/grubnetx64.efi
@@ -112,6 +144,17 @@ cp /var/lib/tftpboot/uefi/grubnetx64.efi /var/lib/tftpboot/grubnetx64.efi 2>/dev
 cp /var/lib/tftpboot/uefi/grubnetx64.efi /var/lib/tftpboot/bootx64.efi 2>/dev/null || true
 mkdir -p /var/lib/tftpboot/grub/x86_64-efi
 cp /var/lib/tftpboot/uefi/grubnetx64.efi /var/lib/tftpboot/grub/x86_64-efi/core.efi 2>/dev/null || true
+
+# Copia unicode.pf2 padrão do sistema Debian
+for uni in /usr/share/grub/unicode.pf2 /usr/lib/grub/unicode.pf2; do
+    if [ -f "$uni" ]; then
+        cp -f "$uni" /data/theme/fonts/unicode.pf2 2>/dev/null || true
+        cp -f "$uni" /var/lib/tftpboot/theme/fonts/unicode.pf2 2>/dev/null || true
+        cp -f "$uni" /var/lib/tftpboot/grub/fonts/unicode.pf2 2>/dev/null || true
+        cp -f "$uni" /var/lib/tftpboot/grub/unicode.pf2 2>/dev/null || true
+        break
+    fi
+done
 
 # Syslinux / BIOS Legacy
 mkdir -p /var/lib/tftpboot/bios/pxelinux.cfg /var/lib/tftpboot/pxelinux.cfg

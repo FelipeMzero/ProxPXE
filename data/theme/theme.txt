@@ -6,7 +6,6 @@
 title-text: ""
 desktop-image: "background.png"
 desktop-color: "#f8fafc"
-terminal-box: "terminal_box_*.png"
 
 # Caixa Central de Menu Estilo Ventoy
 + boot_menu {
@@ -23,7 +22,6 @@ terminal-box: "terminal_box_*.png"
     icon_height = 24
     item_icon_space = 12
     selected_item_pixmap_style = "select_*.png"
-    menu_pixmap_style = "box_*.png"
 }
 
 # Logo do Sistema no Topo (Hospital Menino Jesus)

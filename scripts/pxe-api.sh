@@ -218,6 +218,7 @@ EOF
             # Salva novo conteúdo do .ini
             echo "$POST_DATA" > "$INI_FILE"
             bash "$SCRIPT_DIR/pxe-theme.sh" >/dev/null 2>&1 || true
+            bash "$SCRIPT_DIR/pxe-scan.sh" >/dev/null 2>&1 || true
             cat << 'EOF'
 {
   "status": "ok",

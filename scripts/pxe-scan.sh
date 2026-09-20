@@ -30,21 +30,35 @@ echo "==> [PXE-SCAN] Iniciando escaneamento de ISOs em $ISO_DIR e $PVE_ISO_DIR..
 # Inicia cabeçalho do pxelinux.cfg/default (BIOS Legacy)
 cat << 'EOF' > "$SYS_CFG"
 PATH bios/ /
-UI menu.c32
-DEFAULT menu.c32
+UI vesamenu.c32
+DEFAULT ventoy_grub
 PROMPT 0
 TIMEOUT 150
-ONTIMEOUT 1
+ONTIMEOUT ventoy_grub
 
-MENU TITLE ProxPXE - Hospital Regional Menino Jesus (BIOS)
-MENU COLOR border       30;44   #40ffffff #a0000000 std
-MENU COLOR title        1;36;44 #ffffffff #a0000000 std
-MENU COLOR sel          7;37;40 #e0ffffff #20ffffff all
-MENU COLOR unsel        37;44   #50ffffff #a0000000 std
-MENU COLOR help         37;40   #c0ffffff #a0000000 std
+MENU TITLE ProxPXE - Hospital Regional Menino Jesus (Ventoy Edition)
+MENU BACKGROUND /theme/background.png
+MENU RESOLUTION 1024 768
+
+MENU COLOR screen       37;40   #00000000 #00000000 none
+MENU COLOR border       30;44   #00000000 #00000000 none
+MENU COLOR title        1;36;44 #ff1e40af #00000000 std
+MENU COLOR sel          7;37;40 #ffffffff #ff2563eb all
+MENU COLOR unsel        37;44   #ff334155 #00000000 std
+MENU COLOR help         37;40   #ff64748b #00000000 std
+MENU COLOR timeout      37;40   #ff64748b #00000000 std
+MENU COLOR timeout_msg  37;40   #ff64748b #00000000 std
+
+LABEL ventoy_grub
+    MENU LABEL [>>] INICIAR INTERFACE VENTOY COMPLETA (GRUB2)
+    KERNEL /grub/i386-pc/core.0
 
 LABEL -
-    MENU LABEL  *** SERVIDOR PROXPXE - HOSPITAL REGIONAL MENINO JESUS ***
+    MENU LABEL ----------------------------------------------------
+    MENU DISABLE
+
+LABEL -
+    MENU LABEL  *** ISOs DISPONIVEIS (SELECAO DIRETA SYSLINUX) ***
     MENU DISABLE
 
 EOF
@@ -59,15 +73,21 @@ cat << 'EOF' > "$GRUB_CFG"
 set default="0"
 set timeout="15"
 
-# Carrega módulos essenciais de rede e gráficos
+# Carrega módulos essenciais de rede e gráficos (UEFI e BIOS)
+insmod pxe
 insmod efinet
 insmod tftp
 insmod http
 insmod all_video
+insmod vbe
+insmod vga
+insmod video_bochs
+insmod video_cirrus
 insmod font
 insmod gfxterm
 insmod gfxmenu
 insmod png
+insmod test
 
 # Auto-detecta IP do Servidor PXE
 if [ -n "$net_default_server" ]; then
@@ -80,25 +100,33 @@ echo "    set pxe_server=$SERVER_IP" >> "$GRUB_CFG"
 cat << 'EOF' >> "$GRUB_CFG"
 fi
 
-# Resolução de tela e terminal gráfico
-set gfxmode=1920x1080,1024x768,auto
+# Carrega Fontes (Prioriza TFTP local com fallback em HTTP)
+loadfont (tftp)/theme/fonts/Outfit.pf2
+loadfont (tftp)/theme/fonts/Outfit-11.pf2
+loadfont (tftp)/grub/fonts/Outfit.pf2
+loadfont (tftp)/theme/fonts/unicode.pf2
+loadfont (tftp)/grub/fonts/unicode.pf2
+loadfont ($root)/theme/fonts/Outfit.pf2
+loadfont ($root)/theme/fonts/unicode.pf2
+loadfont (http,$pxe_server)/theme/fonts/Outfit.pf2
+loadfont (http,$pxe_server)/theme/fonts/unicode.pf2
+
+# Resolução de tela e terminal gráfico gfxterm
+set gfxmode=1920x1080,1366x768,1024x768,800x600,auto
 set gfxpayload=keep
 terminal_output gfxterm
 
-# Carrega Fontes e Tema Gráfico do Ventoy
-if loadfont (http,$pxe_server)/theme/fonts/Outfit.pf2 ; then
-    set theme=(http,$pxe_server)/theme/theme.txt
-    export theme
-elif loadfont (http,$pxe_server)/theme/fonts/unicode.pf2 ; then
-    set theme=(http,$pxe_server)/theme/theme.txt
-    export theme
-elif loadfont (tftp)/theme/fonts/Outfit.pf2 ; then
+# Carrega e ativa Tema Gráfico do Ventoy
+if [ -f (tftp)/theme/theme.txt ]; then
     set theme=(tftp)/theme/theme.txt
-    export theme
-elif loadfont (tftp)/theme/fonts/unicode.pf2 ; then
+elif [ -f ($root)/theme/theme.txt ]; then
+    set theme=($root)/theme/theme.txt
+elif [ -f (http,$pxe_server)/theme/theme.txt ]; then
+    set theme=(http,$pxe_server)/theme/theme.txt
+else
     set theme=(tftp)/theme/theme.txt
-    export theme
 fi
+export theme
 
 # ====================================================
 # LISTA DE IMAGENS ISO DETECTADAS
@@ -258,11 +286,15 @@ EOF
     chainloader (http,\$pxe_server)/uefi/ipxe.efi
 EOF
     else
-        # Fallback genérico: Memdisk ou Sanboot
+        # Fallback genérico: Memdisk no BIOS ou iPXE no UEFI
         cat << EOF >> "$GRUB_CFG"
-    echo "Carregando $iso_name em RAM (Memdisk)..."
-    linux16 (http,\$pxe_server)/memdisk iso raw
-    initrd16 (http,\$pxe_server)/$http_dir/$rel_iso_url
+    echo "Carregando $iso_name..."
+    if [ "\$grub_platform" = "pc" ]; then
+        linux16 (http,\$pxe_server)/memdisk iso raw
+        initrd16 (http,\$pxe_server)/$http_dir/$rel_iso_url
+    else
+        chainloader (http,\$pxe_server)/uefi/ipxe.efi
+    fi
 EOF
     fi
 
@@ -413,9 +445,13 @@ EOF
 cp "$SYS_CFG" "$TFTP_DIR/pxelinux.cfg/default" 2>/dev/null || true
 cp "$SYS_CFG" "$TFTP_DIR/default" 2>/dev/null || true
 
-# Espelha o grub.cfg para caminhos procurados por clientes UEFI e TFTP
+# Espelha o grub.cfg para caminhos procurados por clientes UEFI, BIOS e TFTP
+mkdir -p "$TFTP_DIR/grub/i386-pc" "$TFTP_DIR/grub/x86_64-efi" 2>/dev/null || true
+cp "$GRUB_CFG" "$TFTP_DIR/grub/grub.cfg" 2>/dev/null || true
 cp "$GRUB_CFG" "$TFTP_DIR/uefi/grub.cfg" 2>/dev/null || true
 cp "$GRUB_CFG" "$TFTP_DIR/grub.cfg" 2>/dev/null || true
+cp "$GRUB_CFG" "$TFTP_DIR/grub/i386-pc/grub.cfg" 2>/dev/null || true
+cp "$GRUB_CFG" "$TFTP_DIR/grub/x86_64-efi/grub.cfg" 2>/dev/null || true
 
 # Rodapé do iPXE
 cat << 'EOF' >> "$IPXE_CFG"
